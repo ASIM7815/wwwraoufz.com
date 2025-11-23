@@ -8,19 +8,23 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, { 
   cors: { 
-    origin: ["*", "https://www.raoufz.com", "https://raoufz.com", "http://localhost:3000"],
+    origin: "*",
     methods: ["GET", "POST"],
     credentials: true
   },
   transports: ['websocket', 'polling'],
-  pingTimeout: 30000,
-  pingInterval: 10000,
-  upgradeTimeout: 10000,
+  allowUpgrades: true,
+  pingTimeout: 60000,
+  pingInterval: 25000,
+  upgradeTimeout: 30000,
   maxHttpBufferSize: 1e8,
-  allowEIO3: true
+  allowEIO3: true,
+  perMessageDeflate: {
+    threshold: 1024
+  }
 });
 
-// Trust proxy for HTTPS on Render
+// Trust proxy for HTTPS on Railway
 app.set('trust proxy', 1);
 
 app.use(compression()); // Enable gzip compression
@@ -28,14 +32,32 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(__dirname));
 
-// Redirect www to non-www (optional, or vice versa)
+// Security headers for Railway deployment
+app.use((req, res, next) => {
+  // Enable CORS for WebRTC
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+  
+  // Required headers for WebRTC on Railway
+  res.header('X-Content-Type-Options', 'nosniff');
+  res.header('X-Frame-Options', 'SAMEORIGIN');
+  
+  // Handle preflight
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  
+  next();
+});
+
+// HTTPS redirect for Railway
 app.use((req, res, next) => {
   const host = req.header('host');
+  const proto = req.header('x-forwarded-proto');
   
-  // If using www.raoufz.com, keep it (or redirect to non-www if preferred)
-  // For now, accept both www and non-www
-  if (process.env.NODE_ENV === 'production' && req.header('x-forwarded-proto') !== 'https') {
-    // Force HTTPS redirect
+  // Force HTTPS in production (Railway provides this via proxy)
+  if (process.env.RAILWAY_ENVIRONMENT && proto !== 'https') {
     return res.redirect(301, `https://${host}${req.url}`);
   }
   next();
@@ -337,14 +359,29 @@ io.on('connection', (socket) => {
   });
 });
 
-// Health check endpoint for Render
+// Health check endpoint for Railway
 app.get('/health', (req, res) => {
   res.status(200).json({ 
     status: 'healthy',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     protocol: req.protocol,
-    secure: req.secure || req.headers['x-forwarded-proto'] === 'https'
+    secure: req.secure || req.headers['x-forwarded-proto'] === 'https',
+    environment: process.env.RAILWAY_ENVIRONMENT || 'development',
+    activeRooms: Object.keys(rooms).length,
+    activeConnections: io.engine.clientsCount
+  });
+});
+
+// API endpoint to check WebRTC compatibility
+app.get('/api/webrtc-config', (req, res) => {
+  res.json({
+    stunServers: [
+      'stun:stun.l.google.com:19302',
+      'stun:stun1.l.google.com:19302',
+      'stun:stun2.l.google.com:19302'
+    ],
+    environment: process.env.RAILWAY_ENVIRONMENT || 'development'
   });
 });
 

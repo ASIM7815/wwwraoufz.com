@@ -7,7 +7,9 @@
     "start": "node server.js",
     "dev": "node server.js",
     "build": "echo 'No build step required'",
-    "test": "echo 'Tests not configured yet'"
+    "test": "node test-railway.js",
+    "test:local": "node test-railway.js http://localhost:3000",
+    "test:railway": "node test-railway.js"
   },
   "dependencies": {
     "express": "^4.18.2",
