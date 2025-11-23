@@ -1,4 +1,5 @@
 // Initialize Socket.io connection with optimized settings
+console.log('🔌 Initializing Socket.IO connection...');
 window.socket = io({
   transports: ['websocket', 'polling'],
   upgrade: true,
@@ -42,6 +43,7 @@ window.addEventListener('beforeunload', () => {
 
 // Connection status
 socket.on('connect', () => {
+  console.log('✅ Socket.IO connected! Socket ID:', socket.id);
   isOnline = true;
   if (typeof window.updateConnectionStatus === 'function') {
     window.updateConnectionStatus('online');
@@ -50,6 +52,7 @@ socket.on('connect', () => {
 });
 
 socket.on('disconnect', () => {
+  console.log('❌ Socket.IO disconnected');
   isOnline = false;
   if (typeof window.updateConnectionStatus === 'function') {
     window.updateConnectionStatus('offline');
@@ -57,8 +60,17 @@ socket.on('disconnect', () => {
 });
 
 socket.on('connect_error', (error) => {
+  console.error('❌ Socket.IO connection error:', error.message);
   isOnline = false;
   console.error('Connection error:', error.message);
+});
+
+socket.on('reconnect_attempt', (attemptNumber) => {
+  console.log('🔄 Reconnection attempt:', attemptNumber);
+});
+
+socket.on('reconnect', (attemptNumber) => {
+  console.log('✅ Reconnected after', attemptNumber, 'attempts');
 });
 
 // Rate limit exceeded handler
