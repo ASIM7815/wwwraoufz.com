@@ -2,7 +2,7 @@
 class WebRTCHandler {
     constructor() {
         // Debug mode (set to false in production)
-        this.DEBUG = false;
+        this.DEBUG = true;
         
         // Group call support - mesh network
         this.peerConnections = new Map();
@@ -39,7 +39,23 @@ class WebRTCHandler {
                 { urls: 'stun:stun3.l.google.com:19302' },
                 { urls: 'stun:stun4.l.google.com:19302' },
                 { urls: 'stun:stun.services.mozilla.com' },
-                { urls: 'stun:stun.stunprotocol.org:3478' }
+                { urls: 'stun:stun.stunprotocol.org:3478' },
+                // Google's free TURN servers for better connectivity
+                {
+                    urls: 'turn:openrelay.metered.ca:80',
+                    username: 'openrelayproject',
+                    credential: 'openrelayproject'
+                },
+                {
+                    urls: 'turn:openrelay.metered.ca:443',
+                    username: 'openrelayproject',
+                    credential: 'openrelayproject'
+                },
+                {
+                    urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+                    username: 'openrelayproject',
+                    credential: 'openrelayproject'
+                }
             ],
             iceCandidatePoolSize: 10,
             bundlePolicy: 'max-bundle',
@@ -56,15 +72,15 @@ class WebRTCHandler {
     }
     
     log(...args) {
-        if (this.DEBUG) this.log(...args);
+        if (this.DEBUG) console.log('[WebRTC]', ...args);
     }
     
     warn(...args) {
-        if (this.DEBUG) this.warn(...args);
+        if (this.DEBUG) console.warn('[WebRTC]', ...args);
     }
     
     error(...args) {
-        this.error(...args); // Always log errors
+        console.error('[WebRTC ERROR]', ...args); // Always log errors
     }
 
     setupSocketListeners() {
@@ -729,6 +745,7 @@ class WebRTCHandler {
         // Handle remote stream
         this.peerConnection.ontrack = (event) => {
             this.log('📥 Received remote track:', event.track.kind, 'Stream ID:', event.streams[0]?.id);
+            this.log(`   Track details: enabled=${event.track.enabled}, muted=${event.track.muted}, readyState=${event.track.readyState}`);
             
             if (!this.remoteStream) {
                 this.remoteStream = new MediaStream();
@@ -738,10 +755,30 @@ class WebRTCHandler {
             // Add the track to remote stream
             this.remoteStream.addTrack(event.track);
             this.log(`✅ Added ${event.track.kind} track to remote stream. Total tracks: ${this.remoteStream.getTracks().length}`);
-            this.log(`   Track enabled: ${event.track.enabled}, muted: ${event.track.muted}, readyState: ${event.track.readyState}`);
             
-            // Enable the track explicitly
+            // CRITICAL: Force enable all tracks, especially audio
             event.track.enabled = true;
+            
+            // If it's an audio track, log additional details
+            if (event.track.kind === 'audio') {
+                this.log('🔊 AUDIO TRACK RECEIVED - forcing enabled');
+                this.log(`   Audio track label: ${event.track.label}`);
+                this.log(`   Audio track settings:`, event.track.getSettings());
+                
+                // Monitor audio track for any mute changes
+                event.track.onmute = () => {
+                    this.warn('⚠️ Audio track was muted! Re-enabling...');
+                    event.track.enabled = true;
+                };
+                
+                event.track.onunmute = () => {
+                    this.log('✅ Audio track unmuted');
+                };
+                
+                event.track.onended = () => {
+                    this.warn('⚠️ Audio track ended');
+                };
+            }
             
             // Display remote stream immediately
             this.displayRemoteStream();
@@ -984,44 +1021,59 @@ class WebRTCHandler {
     displayRemoteStream() {
         const remoteVideo = document.getElementById('remoteVideoElement');
         if (remoteVideo && this.remoteStream) {
+            this.log('📺 Displaying remote stream...');
+            
             // Set video attributes for better mobile compatibility
             remoteVideo.setAttribute('playsinline', 'true');
             remoteVideo.setAttribute('autoplay', 'true');
-            
-            // CRITICAL: Ensure audio is NOT muted and volume is max
-            remoteVideo.muted = false;
-            remoteVideo.volume = 1.0;
             
             // Check if stream has active tracks
             const videoTracks = this.remoteStream.getVideoTracks();
             const audioTracks = this.remoteStream.getAudioTracks();
             this.log(`📺 Remote stream tracks: ${videoTracks.length} video, ${audioTracks.length} audio`);
             
-            // Enable all audio tracks explicitly
-            audioTracks.forEach(track => {
+            // CRITICAL: Force enable ALL audio tracks
+            audioTracks.forEach((track, index) => {
                 track.enabled = true;
-                this.log(`🔊 Audio track enabled: ${track.label}, readyState: ${track.readyState}`);
+                this.log(`🔊 Audio track ${index}: ${track.label}`);
+                this.log(`   - enabled: ${track.enabled}`);
+                this.log(`   - muted: ${track.muted}`);
+                this.log(`   - readyState: ${track.readyState}`);
+                this.log(`   - settings:`, track.getSettings());
             });
             
             // Enable all video tracks
-            videoTracks.forEach(track => {
+            videoTracks.forEach((track, index) => {
                 track.enabled = true;
-                this.log(`📹 Video track enabled: ${track.label}, readyState: ${track.readyState}`);
+                this.log(`📹 Video track ${index} enabled: ${track.label}, readyState: ${track.readyState}`);
             });
             
             remoteVideo.srcObject = this.remoteStream;
             
+            // CRITICAL: Force unmute and max volume BEFORE play
+            remoteVideo.muted = false;
+            remoteVideo.volume = 1.0;
+            this.log(`🔊 Video element audio settings: muted=${remoteVideo.muted}, volume=${remoteVideo.volume}`);
+            
             // Force play with multiple attempts
             const attemptPlay = () => {
+                // Re-apply unmute before each play attempt
+                remoteVideo.muted = false;
+                remoteVideo.volume = 1.0;
+                
                 const playPromise = remoteVideo.play();
                 if (playPromise !== undefined) {
                     playPromise
                         .then(() => {
                             this.log('✅ Remote video playing successfully');
                             this.log(`🔊 Remote video muted: ${remoteVideo.muted}, volume: ${remoteVideo.volume}`);
+                            this.log(`🔊 Audio tracks: ${audioTracks.length}, Video tracks: ${videoTracks.length}`);
                             
-                            // Start call timer
-                            this.startCallTimer();
+                            // Start call timer IMMEDIATELY
+                            if (!this.callTimerInterval) {
+                                this.startCallTimer();
+                                this.log('⏱️ Call timer started');
+                            }
                             
                             // Update UI to show connected
                             const callStatus = document.getElementById('callStatus');
@@ -1030,20 +1082,35 @@ class WebRTCHandler {
                             if (audioStatus) audioStatus.textContent = 'Connected';
                         })
                         .catch(err => {
-                            this.warn('⚠️ Remote video play attempt failed:', err.name, err.message);
+                            this.warn('⚠️ Remote video autoplay blocked:', err.name, err.message);
+                            this.warn('⚠️ Waiting for user interaction to play audio...');
+                            
+                            // Show user notification
+                            const notification = document.createElement('div');
+                            notification.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#FF6B6B;color:white;padding:15px 25px;border-radius:10px;z-index:10000;font-size:14px;box-shadow:0 4px 12px rgba(0,0,0,0.3);cursor:pointer;';
+                            notification.textContent = '🔊 Tap anywhere to enable audio';
+                            document.body.appendChild(notification);
+                            
                             // Retry after user interaction
                             const retryPlay = () => {
+                                notification.remove();
                                 remoteVideo.muted = false;
                                 remoteVideo.volume = 1.0;
                                 remoteVideo.play()
                                     .then(() => {
                                         this.log('✅ Remote video playing after user interaction');
-                                        this.startCallTimer();
+                                        if (!this.callTimerInterval) {
+                                            this.startCallTimer();
+                                            this.log('⏱️ Call timer started after interaction');
+                                        }
                                     })
-                                    .catch(e => this.error('Manual play failed:', e));
+                                    .catch(e => this.error('❌ Manual play failed:', e));
                             };
+                            
+                            notification.addEventListener('click', retryPlay);
                             document.addEventListener('click', retryPlay, { once: true });
                             document.addEventListener('touchstart', retryPlay, { once: true });
+                            document.addEventListener('touchend', retryPlay, { once: true });
                         });
                 }
             };
