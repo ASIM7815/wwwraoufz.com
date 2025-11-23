@@ -130,12 +130,13 @@ setInterval(cleanupInactiveRooms, ROOM_CLEANUP_INTERVAL);
 io.on('connection', (socket) => {
   console.log('✅ User connected:', socket.id);
   
-  socket.on('create-room', ({ roomCode, username }) => {
+  socket.on('createRoom', (roomCode) => {
     if (rooms[roomCode]) {
       socket.emit('room-exists', { roomCode });
       return;
     }
     
+    const username = socket.username || 'Anonymous';
     const userColor = participantColors[Math.floor(Math.random() * participantColors.length)];
     
     rooms[roomCode] = {
@@ -161,7 +162,7 @@ io.on('connection', (socket) => {
     console.log(`🏠 Room created: ${roomCode} by ${username}`);
   });
   
-  socket.on('join-room', ({ roomCode, username }) => {
+  socket.on('joinRoom', ({ roomCode, username }) => {
     if (!rooms[roomCode]) {
       socket.emit('room-not-found', { roomCode });
       return;
