@@ -3,7 +3,6 @@ const http = require('http');
 const socketIo = require('socket.io');
 const cors = require('cors');
 const compression = require('compression');
-const { WebSocketServer } = require('ws');
 
 const app = express();
 const server = http.createServer(app);
@@ -25,14 +24,6 @@ const io = socketIo(server, {
   perMessageDeflate: {
     threshold: 1024
   }
-});
-
-// WebSocket server for HD video streaming
-const wss = new WebSocketServer({ 
-  server,
-  path: '/stream',
-  perMessageDeflate: false,
-  maxPayload: 10 * 1024 * 1024 // 10MB per message
 });
 
 // Trust proxy for Railway
@@ -72,7 +63,6 @@ app.use((req, res, next) => {
 const messages = {};
 const users = {};
 const rooms = {};
-const streamRooms = new Map();
 
 // Rate limiting
 const rateLimits = new Map();
@@ -289,127 +279,6 @@ io.on('connection', (socket) => {
   });
 });
 
-// WebSocket HD video streaming
-wss.on('connection', (ws, req) => {
-  let currentRoom = null;
-  let peerId = null;
-  
-  console.log('🎥 Stream client connected');
-  
-  ws.on('message', (data) => {
-    try {
-      if (data instanceof Buffer || data instanceof ArrayBuffer) {
-        // Binary video chunk
-        if (currentRoom && streamRooms.has(currentRoom)) {
-          const peers = streamRooms.get(currentRoom);
-          peers.forEach(peer => {
-            if (peer.ws !== ws && peer.ws.readyState === 1) {
-              const header = Buffer.from(JSON.stringify({ 
-                type: 'video-chunk',
-                from: peerId,
-                timestamp: Date.now()
-              }) + '\n');
-              peer.ws.send(Buffer.concat([header, Buffer.from(data)]));
-            }
-          });
-        }
-      } else {
-        // JSON control message
-        const message = JSON.parse(data.toString());
-        
-        switch (message.type) {
-          case 'join-stream':
-            currentRoom = message.roomCode;
-            peerId = message.peerId;
-            
-            if (!streamRooms.has(currentRoom)) {
-              streamRooms.set(currentRoom, new Set());
-            }
-            
-            streamRooms.get(currentRoom).add({ ws, peerId });
-            console.log(`✅ ${peerId} joined stream room ${currentRoom}`);
-            
-            // Notify others
-            const peers = streamRooms.get(currentRoom);
-            peers.forEach(peer => {
-              if (peer.ws !== ws && peer.ws.readyState === 1) {
-                peer.ws.send(JSON.stringify({
-                  type: 'peer-joined',
-                  peerId: peerId
-                }));
-              }
-            });
-            
-            // Send peer list
-            const peerList = Array.from(peers)
-              .filter(p => p.ws !== ws)
-              .map(p => p.peerId);
-            ws.send(JSON.stringify({
-              type: 'peers-list',
-              peers: peerList
-            }));
-            break;
-            
-          case 'leave-stream':
-            if (currentRoom && streamRooms.has(currentRoom)) {
-              const peers = streamRooms.get(currentRoom);
-              peers.forEach(peer => {
-                if (peer.peerId === peerId) {
-                  peers.delete(peer);
-                }
-              });
-              
-              peers.forEach(peer => {
-                if (peer.ws.readyState === 1) {
-                  peer.ws.send(JSON.stringify({
-                    type: 'peer-left',
-                    peerId: peerId
-                  }));
-                }
-              });
-              
-              if (peers.size === 0) {
-                streamRooms.delete(currentRoom);
-              }
-            }
-            break;
-        }
-      }
-    } catch (error) {
-      console.error('❌ Stream message error:', error);
-    }
-  });
-  
-  ws.on('close', () => {
-    if (currentRoom && streamRooms.has(currentRoom)) {
-      const peers = streamRooms.get(currentRoom);
-      peers.forEach(peer => {
-        if (peer.peerId === peerId) {
-          peers.delete(peer);
-        }
-      });
-      
-      peers.forEach(peer => {
-        if (peer.ws.readyState === 1) {
-          peer.ws.send(JSON.stringify({
-            type: 'peer-left',
-            peerId: peerId
-          }));
-        }
-      });
-      
-      if (peers.size === 0) {
-        streamRooms.delete(currentRoom);
-      }
-    }
-    console.log('🎥 Stream client disconnected');
-  });
-  
-  ws.on('error', (error) => {
-    console.error('❌ WebSocket error:', error);
-  });
-});
-
 // Health check
 app.get('/health', (req, res) => {
   res.status(200).json({ 
@@ -420,8 +289,7 @@ app.get('/health', (req, res) => {
     secure: req.secure || req.headers['x-forwarded-proto'] === 'https',
     environment: process.env.RAILWAY_ENVIRONMENT || 'development',
     activeRooms: Object.keys(rooms).length,
-    activeConnections: io.engine.clientsCount,
-    streamingPeers: streamRooms.size
+    activeConnections: io.engine.clientsCount
   });
 });
 
