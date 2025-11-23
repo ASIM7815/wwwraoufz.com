@@ -232,6 +232,20 @@
                     </div>
                     
                     <p class="welcome-footer">Select a chat to begin your journey</p>
+                    
+                    <!-- HD Stream Mode Info -->
+                    <div style="margin-top: 30px; padding: 20px; background: linear-gradient(135deg, rgba(0,102,204,0.1), rgba(0,71,171,0.1)); border-radius: 12px; text-align: center; border: 2px solid rgba(0,102,204,0.3);">
+                        <div style="display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 10px;">
+                            <span style="font-size: 24px;">🎥</span>
+                            <span style="font-weight: 600; color: #0047AB; font-size: 16px;">HD Recording + Live Streaming</span>
+                        </div>
+                        <p style="margin: 10px 0 0; font-size: 12px; color: #666; line-height: 1.6;">
+                            ✅ 1920x1080 @ 60fps<br>
+                            ✅ 5 Mbps bitrate - Professional Quality<br>
+                            ✅ Both users get maximum camera quality<br>
+                            ✅ Live streaming without saving files
+                        </p>
+                    </div>
                 </div>
             </div>
 
@@ -874,7 +888,9 @@
     <!-- Scripts -->
     <script src="script.js"></script>
     <script src="client.js"></script>
-    <script src="webrtc-handler.js"></script>
+    <script src="stream-handler.js"></script>
+    <!-- webrtc-handler.js disabled - using HD Stream only -->
+    <script src="call-router.js"></script>
     
     <script>
         // Welcome Audio Control Functions

@@ -3,6 +3,7 @@ const http = require('http');
 const socketIo = require('socket.io');
 const cors = require('cors');
 const compression = require('compression');
+const { WebSocketServer } = require('ws');
 
 const app = express();
 const server = http.createServer(app);
@@ -22,6 +23,14 @@ const io = socketIo(server, {
   perMessageDeflate: {
     threshold: 1024
   }
+});
+
+// WebSocket server for high-quality video streaming (non-WebRTC)
+const wss = new WebSocketServer({ 
+  server,
+  path: '/stream',
+  perMessageDeflate: false, // Disable compression for video chunks
+  maxPayload: 10 * 1024 * 1024 // 10MB per message
 });
 
 // Trust proxy for HTTPS on Railway
@@ -369,7 +378,151 @@ app.get('/health', (req, res) => {
     secure: req.secure || req.headers['x-forwarded-proto'] === 'https',
     environment: process.env.RAILWAY_ENVIRONMENT || 'development',
     activeRooms: Object.keys(rooms).length,
-    activeConnections: io.engine.clientsCount
+    activeConnections: io.engine.clientsCount,
+    streamingPeers: streamRooms.size
+  });
+});
+
+// WebSocket-based video streaming (no WebRTC)
+const streamRooms = new Map(); // roomCode -> Set of ws connections
+
+wss.on('connection', (ws, req) => {
+  let currentRoom = null;
+  let peerId = null;
+  
+  console.log('🎥 Stream client connected');
+  
+  ws.on('message', (data) => {
+    try {
+      // Check if it's JSON control message or binary video chunk
+      if (data instanceof Buffer || data instanceof ArrayBuffer) {
+        // Binary video chunk - relay to room peers
+        if (currentRoom && streamRooms.has(currentRoom)) {
+          const peers = streamRooms.get(currentRoom);
+          peers.forEach(peer => {
+            if (peer.ws !== ws && peer.ws.readyState === 1) {
+              // Send with metadata header
+              const header = Buffer.from(JSON.stringify({ 
+                type: 'video-chunk',
+                from: peerId,
+                timestamp: Date.now()
+              }) + '\n');
+              peer.ws.send(Buffer.concat([header, Buffer.from(data)]));
+            }
+          });
+        }
+      } else {
+        // JSON control message
+        const message = JSON.parse(data.toString());
+        
+        switch (message.type) {
+          case 'join-stream':
+            currentRoom = message.roomCode;
+            peerId = message.peerId;
+            
+            if (!streamRooms.has(currentRoom)) {
+              streamRooms.set(currentRoom, new Set());
+            }
+            
+            streamRooms.get(currentRoom).add({ ws, peerId });
+            console.log(`✅ ${peerId} joined stream room ${currentRoom}`);
+            
+            // Notify others in room
+            const peers = streamRooms.get(currentRoom);
+            peers.forEach(peer => {
+              if (peer.ws !== ws && peer.ws.readyState === 1) {
+                peer.ws.send(JSON.stringify({
+                  type: 'peer-joined',
+                  peerId: peerId
+                }));
+              }
+            });
+            
+            // Send current peers list to new joiner
+            const peerList = Array.from(peers)
+              .filter(p => p.ws !== ws)
+              .map(p => p.peerId);
+            ws.send(JSON.stringify({
+              type: 'peers-list',
+              peers: peerList
+            }));
+            break;
+            
+          case 'leave-stream':
+            if (currentRoom && streamRooms.has(currentRoom)) {
+              const peers = streamRooms.get(currentRoom);
+              peers.forEach(peer => {
+                if (peer.peerId === peerId) {
+                  peers.delete(peer);
+                }
+              });
+              
+              // Notify others
+              peers.forEach(peer => {
+                if (peer.ws.readyState === 1) {
+                  peer.ws.send(JSON.stringify({
+                    type: 'peer-left',
+                    peerId: peerId
+                  }));
+                }
+              });
+              
+              if (peers.size === 0) {
+                streamRooms.delete(currentRoom);
+              }
+            }
+            break;
+            
+          case 'stream-quality':
+            // Relay quality change to room
+            if (currentRoom && streamRooms.has(currentRoom)) {
+              const peers = streamRooms.get(currentRoom);
+              peers.forEach(peer => {
+                if (peer.ws !== ws && peer.ws.readyState === 1) {
+                  peer.ws.send(JSON.stringify({
+                    type: 'peer-quality-change',
+                    peerId: peerId,
+                    quality: message.quality
+                  }));
+                }
+              });
+            }
+            break;
+        }
+      }
+    } catch (error) {
+      console.error('❌ Stream message error:', error);
+    }
+  });
+  
+  ws.on('close', () => {
+    if (currentRoom && streamRooms.has(currentRoom)) {
+      const peers = streamRooms.get(currentRoom);
+      peers.forEach(peer => {
+        if (peer.peerId === peerId) {
+          peers.delete(peer);
+        }
+      });
+      
+      // Notify others
+      peers.forEach(peer => {
+        if (peer.ws.readyState === 1) {
+          peer.ws.send(JSON.stringify({
+            type: 'peer-left',
+            peerId: peerId
+          }));
+        }
+      });
+      
+      if (peers.size === 0) {
+        streamRooms.delete(currentRoom);
+      }
+    }
+    console.log('🎥 Stream client disconnected');
+  });
+  
+  ws.on('error', (error) => {
+    console.error('❌ WebSocket error:', error);
   });
 });
 
