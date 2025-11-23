@@ -630,6 +630,25 @@ function disableCallButtons() {
     }
 }
 
+// Call functions - Socket.IO only
+function startVideoCall() {
+    console.log('📹 Starting video call...');
+    if (!currentRoomCode) {
+        alert('Please create or join a room first');
+        return;
+    }
+    alert('Video call feature - Coming soon! Room ready for connection.');
+}
+
+function startAudioCall() {
+    console.log('📞 Starting audio call...');
+    if (!currentRoomCode) {
+        alert('Please create or join a room first');
+        return;
+    }
+    alert('Audio call feature - Coming soon! Room ready for connection.');
+}
+
 // All UI and connection functions implemented
 
 // Onboarding Tutorial Functions
@@ -907,26 +926,6 @@ window.closeDeviceTest = closeDeviceTest;
 window.startDeviceTest = startDeviceTest;
 window.stopDeviceTest = stopDeviceTest;
 window.showHelpTutorial = showHelpTutorial;
-
-// Simple call functions - using Socket.IO only (no WebSocket/WebRTC)
-function startVideoCall() {
-    console.log('📹 Starting video call...');
-    if (!currentRoomCode) {
-        alert('Please create or join a room first');
-        return;
-    }
-    alert('Video call feature - Coming soon! Room ready for connection.');
-}
-
-function startAudioCall() {
-    console.log('📞 Starting audio call...');
-    if (!currentRoomCode) {
-        alert('Please create or join a room first');
-        return;
-    }
-    alert('Audio call feature - Coming soon! Room ready for connection.');
-}
-
 window.startVideoCall = startVideoCall;
 window.startAudioCall = startAudioCall;
 window.enableCallButtons = enableCallButtons;
