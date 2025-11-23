@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#0047AB">
+    <title>RAOUFz - Connect Instantly</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
+</head>
+<body>
+    <!-- Mobile Sidebar Toggle -->
+    <button class="mobile-sidebar-toggle" id="mobileSidebarToggle" onclick="toggleMobileSidebar()">
+        <svg viewBox="0 0 24 24" width="24" height="24">
+            <path fill="currentColor" d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V4H3z"/>
+        </svg>
+    </button>
+
+    <!-- Mobile Overlay -->
+    <div class="mobile-overlay" id="mobileOverlay" onclick="closeMobileSidebar()"></div>
+
+    <div class="container">
+        <!-- Sidebar -->
+        <div class="sidebar" id="sidebar">
+            <!-- Header -->
+            <div class="sidebar-header">
+                <div class="profile-avatar" onclick="openProfile()">
+                    <div class="avatar-circle" style="background: linear-gradient(135deg, #0047AB, #0066CC);">YO</div>
+                    <span class="online-indicator"></span>
+                </div>
+                <div class="header-icons">
+                    <button class="icon-btn" id="playAudioBtn" title="Play Welcome Audio" onclick="playWelcomeAudio()">
+                        <svg viewBox="0 0 24 24" width="24" height="24">
+                            <defs>
+                                <linearGradient id="playGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" style="stop-color:#00CC66;stop-opacity:1" />
+                                    <stop offset="100%" style="stop-color:#00AA55;stop-opacity:1" />
+                                </linearGradient>
+                            </defs>
+                            <circle fill="url(#playGrad)" cx="12" cy="12" r="10" opacity="0.2"/>
+                            <path fill="currentColor" d="M8 5v14l11-7z"/>
+                        </svg>
+                    </button>
+                    <button class="icon-btn" id="stopAudioBtn" title="Stop Audio" onclick="stopWelcomeAudio()" style="display: none;">
+                        <svg viewBox="0 0 24 24" width="24" height="24">
+                            <defs>
+                                <linearGradient id="stopGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" style="stop-color:#CC0000;stop-opacity:1" />
+                                    <stop offset="100%" style="stop-color:#AA0000;stop-opacity:1" />
+                                </linearGradient>
+                            </defs>
+                            <circle fill="url(#stopGrad)" cx="12" cy="12" r="10" opacity="0.2"/>
+                            <rect fill="currentColor" x="6" y="6" width="12" height="12"/>
+                        </svg>
+                    </button>
+                    <button class="icon-btn" title="Help & Tutorial" onclick="showHelpTutorial()">
+                        <svg viewBox="0 0 24 24" width="24" height="24">
+                            <defs>
+                                <linearGradient id="helpGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" style="stop-color:#FFB800;stop-opacity:1" />
+                                    <stop offset="100%" style="stop-color:#FF9900;stop-opacity:1" />
+                                </linearGradient>
+                            </defs>
+                            <circle fill="url(#helpGrad)" cx="12" cy="12" r="10" opacity="0.2"/>
+                            <path fill="currentColor" d="M11 18h2v-2h-2v2zm1-16C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-2.21 0-4 1.79-4 4h2c0-1.1.9-2 2-2s2 .9 2 2c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5 0-2.21-1.79-4-4-4z"/>
+                        </svg>
+                    </button>
+                    <button class="icon-btn" title="Menu">
+                        <svg viewBox="0 0 24 24" width="24" height="24">
+                            <defs>
+                                <linearGradient id="menuGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                                    <stop offset="0%" style="stop-color:#0066CC;stop-opacity:1" />
+                                    <stop offset="100%" style="stop-color:#0047AB;stop-opacity:1" />
+                                </linearGradient>
+                            </defs>
+  
+                            <circle fill="url(#menuGrad)" cx="12" cy="5" r="2.5"/>
+                            <circle fill="url(#menuGrad)" cx="12" cy="12" r="2.5"/>
+                            <circle fill="url(#menuGrad)" cx="12" cy="19" r="2.5"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Search -->
+            <div class="search-container">
+                <div class="search-box">
+                    <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M15.009 13.805h-.636l-.22-.219a5.184 5.184 0 0 0 1.256-3.386 5.207 5.207 0 1 0-5.207 5.208 5.183 5.183 0 0 0 3.385-1.255l.221.22v.635l4.004 3.999 1.194-1.195-3.997-4.007zm-4.808 0a3.605 3.605 0 1 1 0-7.21 3.605 3.605 0 0 1 0 7.21z"/></svg>
+                    <input type="text" placeholder="Search or start new chat">
+                </div>
+                <button class="filter-btn" title="Filter"><svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z"/></svg></button>
+            </div>
+
+            <!-- Tabs -->
+            <div class="tabs">
+                <button class="tab active">
+                    <div class="tab-icon-3d">
+                        <svg viewBox="0 0 24 24" width="22" height="22">
+                            <defs>
+                                <linearGradient id="chatGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" style="stop-color:#0066CC;stop-opacity:1" />
+                                    <stop offset="100%" style="stop-color:#0047AB;stop-opacity:1" />
+                                </linearGradient>
+                            </defs>
+                            <path fill="url(#chatGrad)" d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 9h12v2H6V9zm8 5H6v-2h8v2zm4-6H6V6h12v2z"/>
+                        </svg>
+                    </div>
+                    Chats
+                </button>
+                <button class="tab" onclick="showStatus()">
+                    <div class="tab-icon-3d">
+                        <svg viewBox="0 0 24 24" width="22" height="22">
+                            <defs>
+                                <linearGradient id="statusGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" style="stop-color:#0066CC;stop-opacity:1" />
+                                    <stop offset="100%" style="stop-color:#0047AB;stop-opacity:1" />
+                                </linearGradient>
+                            </defs>
+                            <circle fill="url(#statusGrad)" cx="12" cy="12" r="10"/>
+                            <circle fill="rgba(255,255,255,0.3)" cx="12" cy="12" r="6"/>
+                        </svg>
+                    </div>
+                    Status
+                </button>
+                <button class="tab">
+                    <div class="tab-icon-3d">
+                        <svg viewBox="0 0 24 24" width="22" height="22">
+                            <defs>
+                                <linearGradient id="callGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" style="stop-color:#0066CC;stop-opacity:1" />
+                                    <stop offset="100%" style="stop-color:#0047AB;stop-opacity:1" />
+                                </linearGradient>
+                            </defs>
+                            <path fill="url(#callGrad)" d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56-.35-.12-.74-.03-1.01.24l-1.57 1.97c-2.83-1.35-5.48-3.9-6.89-6.83l1.95-1.66c.27-.28.35-.67.24-1.02-.37-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z"/>
+                        </svg>
+                    </div>
+                    Calls
+                </button>
+            </div>
+
+            <!-- Chat List -->
+            <div class="chat-list">
+                <!-- Welcome Message -->
+                <div class="chat-list-welcome">
+                    <h2 class="welcome-title">WELCOME TO RAOUFz</h2>
+                    <p class="welcome-text">Connect with your loved ones through video calling, audio calling, and secure messaging. Your privacy matters.</p>
+                </div>
+                
+                <!-- Room Info Card (shown when in a room) -->
+                <div id="roomInfoCard" style="display: none; margin: 15px; padding: 15px; background: linear-gradient(135deg, rgba(0, 102, 204, 0.2), rgba(0, 71, 171, 0.2)); border-radius: 12px; border: 1px solid rgba(0, 102, 204, 0.3);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <h3 style="color: white; margin: 0; font-size: 14px; font-weight: 600;">🎉 Room Active</h3>
+                        <div id="roomColorIndicator" style="width: 20px; height: 20px; border-radius: 50%; border: 2px solid white;"></div>
+                    </div>
+                    <div style="background: rgba(0,0,0,0.2); padding: 10px; border-radius: 8px; margin-bottom: 10px;">
+                        <p style="color: rgba(255,255,255,0.7); margin: 0 0 5px 0; font-size: 11px;">Room Code:</p>
+                        <p id="roomCodeDisplay" style="color: white; margin: 0; font-size: 18px; font-weight: bold; letter-spacing: 2px;">----</p>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button onclick="copyRoomLink()" style="flex: 1; background: #0066CC; color: white; border: none; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 12px; display: flex; align-items: center; justify-content: center; gap: 5px;">
+                            📋 Copy Link
+                        </button>
+                        <button onclick="shareRoomLink()" style="flex: 1; background: #00AA55; color: white; border: none; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 12px; display: flex; align-items: center; justify-content: center; gap: 5px;">
+                            📤 Share
+                        </button>
+                    </div>
+                    <div id="participantsCount" style="margin-top: 10px; text-align: center; color: rgba(255,255,255,0.7); font-size: 12px;">
+                        👥 1 participant
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Resizer -->
+        <div class="resizer" id="resizer"></div>
+
+        <!-- Main Chat Area -->
+        <div class="main-chat" id="mainChat">
+            <!-- Welcome Screen -->
+            <div class="welcome-screen" id="welcomeScreen">
+                <div class="welcome-content">
+                    <div class="welcome-icon">
+                        <svg viewBox="0 0 200 200" width="200" height="200">
+                            <circle cx="100" cy="80" r="30" fill="#0047AB" opacity="0.5"/>
+                            <circle cx="130" cy="100" r="35" fill="#0066CC" opacity="0.6"/>
+                        </svg>
+                    </div>
+                    <h1 class="logo-breathe"><span style="color: #0047AB;">RAOUFz</span> <span style="color: #5a8fd6;">for Web</span></h1>
+                    <p class="subtitle">Connect & Feel</p>
+                    
+                    <div class="features-grid">
+                        <div class="feature-card">
+                            <div class="icon-glow">
+                                <svg viewBox="0 0 24 24" width="50" height="50" fill="#0047AB"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
+                            </div>
+                            <h3>Real-time Chat</h3>
+                        </div>
+                        <div class="feature-card">
+                            <div class="icon-glow">
+                                <svg viewBox="0 0 24 24" width="50" height="50" fill="#0066CC"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
+                            </div>
+                            <h3>Video Callz</h3>
+                        </div>
+                        <div class="feature-card">
+                            <div class="icon-glow">
+                                <svg viewBox="0 0 24 24" width="50" height="50" fill="#0047AB"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+                            </div>
+                            <h3>Duo chat</h3>
+                        </div>
+                        <div class="feature-card">
+                            <div class="icon-glow">
+                                <svg viewBox="0 0 24 24" width="50" height="50" fill="#0066CC"><path d="M7 2v11h3v9l7-12h-4l4-8z"/></svg>
+                            </div>
+                            <h3>Instant Status</h3>
+                        </div>
+                        <div class="feature-card">
+                            <div class="icon-glow">
+                                <svg viewBox="0 0 24 24" width="50" height="50" fill="#0047AB"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+                            </div>
+                            <h3>RAOUFz Chat</h3>
+                        </div>
+                        <div class="feature-card">
+                            <div class="icon-glow">
+                                <svg viewBox="0 0 24 24" width="50" height="50" fill="#0066CC"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                            </div>
+                            <h3>React & Share</h3>
+                        </div>
+                    </div>
+                    
+                    <p class="welcome-footer">Select a chat to begin your journey</p>
+                </div>
+            </div>
+
+            <!-- Connection Status Banner -->
+            <div class="connection-status-banner" id="connectionStatusBanner" style="display: none;">
+                <div class="status-content">
+                    <div class="status-icon">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                        </svg>
+                    </div>
+                    <div class="status-text">
+                        <strong id="statusTitle">Ready to Call</strong>
+                        <span id="statusMessage">Both users connected - Video and audio calls available</span>
+                    </div>
+                </div>
+                <button class="status-close" onclick="hideConnectionBanner()">×</button>
+            </div>
+
+            <!-- Chat Window -->
+            <div class="chat-window" id="chatWindow" style="display: none;">
+                <!-- Mobile Chat Header -->
+                <div class="mobile-chat-header" id="mobileChatHeader">
+                    <button class="mobile-back-btn" onclick="closeMobileChat()">
+                        <svg viewBox="0 0 24 24" width="24" height="24">
+                            <path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
+                        </svg>
+                    </button>
+                    <div class="mobile-chat-info">
+                        <div class="avatar-circle" style="background: linear-gradient(135deg, #0047AB, #0066CC);">AJ</div>
+                        <div>
+                            <h3 id="mobileChatUserName">Alice Johnson</h3>
+                            <span class="status">online</span>
+                        </div>
+                    </div>
+                    <div class="mobile-actions">
+                        <button class="icon-btn">
+                            <svg viewBox="0 0 24 24" width="20" height="20">
+                                <path fill="currentColor" d="M12 7a2 2 0 1 0-.001-4.001A2 2 0 0 0 12 7zm0 2a2 2 0 1 0-.001 3.999A2 2 0 0 0 12 9zm0 6a2 2 0 1 0-.001 3.999A2 2 0 0 0 12 15z"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Desktop Chat Header -->
+                <div class="chat-window-header">
+                    <button class="desktop-back-btn" onclick="closeDesktopChat()" title="Back to chats">
+                        <svg viewBox="0 0 24 24" width="24" height="24">
+                            <path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
+                        </svg>
+                    </button>
+                    <div class="chat-user-info">
+                        <div class="avatar-circle" style="background: linear-gradient(135deg, #0047AB, #0066CC);">AJ</div>
+                        <div>
+                            <h3 id="chatUserName">Alice Johnson</h3>
+                            <span class="status" id="connectionStatus">away</span>
+                        </div>
+                    </div>
+                    <div class="chat-actions">
+                        <button class="icon-btn"><svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg></button>
+                        <button class="icon-btn"><svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M12 7a2 2 0 1 0-.001-4.001A2 2 0 0 0 12 7zm0 2a2 2 0 1 0-.001 3.999A2 2 0 0 0 12 9zm0 6a2 2 0 1 0-.001 3.999A2 2 0 0 0 12 15z"/></svg></button>
+                    </div>
+                </div>
+
+                <!-- Messages Area -->
+                <div class="messages-area">
+                    <div class="date-divider">
+                        <span>Today</span>
+                    </div>
+                    
+                    <div class="message received">
+                        <div class="message-content">
+                            <p>Hey! How are you?</p>
+                            <span class="message-time">12:00 PM</span>
+                        </div>
+                    </div>
+
+                    <div class="message sent">
+                        <div class="message-content">
+                            <p>I'm doing great, thanks! How about you?</p>
+                            <span class="message-time">12:05 PM</span>
+                        </div>
+                    </div>
+
+                    <div class="message received">
+                        <div class="message-content">
+                            <p>Pretty good! Want to grab coffee later?</p>
+                            <span class="message-time">14:10 PM</span>
+                        </div>
+                    </div>
+
+                    <div class="message sent">
+                        <div class="message-content">
+                            <p>Sure! What time works for you?</p>
+                            <span class="message-time">15:15 PM</span>
+                        </div>
+                    </div>
+
+                    <div class="message received">
+                        <div class="message-content">
+                            <p>How about 3 PM?</p>
+                            <span class="message-time">16:20 PM</span>
+                        </div>
+                    </div>
+
+                    <div class="message sent">
+                        <div class="message-content">
+                            <p>Perfect! See you then! 😊</p>
+                            <span class="message-time">17:25 PM</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Message Input -->
+                <div class="message-input-container">
+                    <button class="icon-btn"><svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M9.153 11.603c.795 0 1.439-.879 1.439-1.962s-.644-1.962-1.439-1.962-1.439.879-1.439 1.962.644 1.962 1.439 1.962zm-3.204 1.362c-.026-.307-.131 5.218 6.063 5.551 6.066-.25 6.066-5.551 6.066-5.551-6.078 1.416-12.129 0-12.129 0zm11.363 1.108s-.669 1.959-5.051 1.959c-3.505 0-5.388-1.164-5.607-1.959 0 0 5.912 1.055 10.658 0zM11.804 1.011C5.609 1.011.978 6.033.978 12.228s4.826 10.761 11.021 10.761S23.02 18.423 23.02 12.228c.001-6.195-5.021-11.217-11.216-11.217zM12 21.354c-5.273 0-9.381-3.886-9.381-9.159s3.942-9.548 9.215-9.548 9.548 4.275 9.548 9.548c-.001 5.272-4.109 9.159-9.382 9.159zm3.108-9.751c.795 0 1.439-.879 1.439-1.962s-.644-1.962-1.439-1.962-1.439.879-1.439 1.962.644 1.962 1.439 1.962z"/></svg></button>
+                    <button class="icon-btn"><svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M1.816 15.556v.002c0 1.502.584 2.912 1.646 3.972s2.472 1.647 3.974 1.647a5.58 5.58 0 0 0 3.972-1.645l9.547-9.548c.769-.768 1.147-1.767 1.058-2.817-.079-.968-.548-1.927-1.319-2.698-1.594-1.592-4.068-1.711-5.517-.262l-7.916 7.915c-.881.881-.792 2.25.214 3.261.959.958 2.423 1.053 3.263.215l5.511-5.512c.28-.28.267-.722.053-.936l-.244-.244c-.191-.191-.567-.349-.957.04l-5.506 5.506c-.18.18-.635.127-.976-.214-.098-.097-.576-.613-.213-.973l7.915-7.917c.818-.817 2.267-.699 3.23.262.5.501.802 1.1.849 1.685.051.573-.156 1.111-.589 1.543l-9.547 9.549a3.97 3.97 0 0 1-2.829 1.171 3.975 3.975 0 0 1-2.83-1.173 3.973 3.973 0 0 1-1.172-2.828c0-1.071.415-2.076 1.172-2.83l7.209-7.211c.157-.157.264-.579.028-.814L11.5 4.36a.572.572 0 0 0-.834.018l-7.205 7.207a5.577 5.577 0 0 0-1.645 3.971z"/></svg></button>
+                    <div class="input-wrapper">
+                        <input type="text" placeholder="Type a message" id="messageInput">
+                    </div>
+                    <button class="icon-btn send-btn" onclick="sendMessage()"><svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M1.101 21.757L23.8 12.028 1.101 2.3l.011 7.912 13.623 1.816-13.623 1.817-.011 7.912z"/></svg></button>
+                    <button class="icon-btn"><svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M11.999 14.942c2.001 0 3.531-1.53 3.531-3.531V4.35c0-2.001-1.53-3.531-3.531-3.531S8.469 2.35 8.469 4.35v7.061c0 2.001 1.53 3.531 3.53 3.531zm6.238-3.53c0 3.531-2.942 6.002-6.237 6.002s-6.237-2.471-6.237-6.002H3.761c0 4.001 3.178 7.297 7.061 7.885v3.884h2.354v-3.884c3.884-.588 7.061-3.884 7.061-7.885h-2z"/></svg></button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Profile Panel -->
+        <div class="profile-panel" id="profilePanel">
+            <div class="profile-header">
+                <button class="icon-btn" onclick="closeProfile()"><svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M12 4l1.41 1.41L7.83 11H20v2H7.83l5.58 5.59L12 20l-8-8 8-8z"/></svg></button>
+                <h2>Profile</h2>
+            </div>
+            <div class="profile-content">
+                <div class="profile-photo-section">
+                    <div class="profile-photo">
+                        <div class="avatar-circle large" style="background: linear-gradient(135deg, #0047AB, #0066CC);">AJ</div>
+                    </div>
+                </div>
+                <div class="profile-info-section">
+                    <div class="info-row">
+                        <label>Your name</label>
+                        <p>Alice Johnson</p>
+                    </div>
+                    <div class="info-row">
+                        <label>About</label>
+                        <p>Hey there! I am using RAOUFz</p>
+                    </div>
+                    <div class="info-row">
+                        <label>Phone</label>
+                        <p>+1 234 567 8900</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+
+    <!-- Incoming Call Modal - Modern Design -->
+    <div class="modal-overlay incoming-call-overlay" id="incomingCallModal" style="display: none;">
+        <div class="incoming-call-container">
+            <!-- Background Gradient Animation -->
+            <div class="call-bg-animation"></div>
+            
+            <!-- Call Content -->
+            <div class="incoming-call-content">
+                <!-- Caller Avatar with Ripple -->
+                <div class="caller-avatar-wrapper">
+                    <div class="ripple-effect"></div>
+                    <div class="ripple-effect delay-1"></div>
+                    <div class="ripple-effect delay-2"></div>
+                    <div class="caller-avatar-modern">
+                        <svg viewBox="0 0 24 24" width="60" height="60" fill="white">
+                            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                        </svg>
+                    </div>
+                </div>
+                
+                <!-- Caller Info -->
+                <div class="caller-info-modern">
+                    <h2 id="incomingCallerName" class="caller-name-modern">User</h2>
+                    <div class="call-type-badge">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" id="callTypeIcon">
+                            <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/>
+                        </svg>
+                        <span id="incomingCallType">Video Call</span>
+                    </div>
+                    <p class="incoming-call-subtitle">Secure connection</p>
+                </div>
+            </div>
+            
+            <!-- Call Actions - Modern Buttons -->
+            <div class="incoming-call-actions">
+                <button class="modern-call-btn decline-btn" onclick="rejectIncomingCall()">
+                    <div class="btn-icon-wrapper">
+                        <svg viewBox="0 0 24 24" width="30" height="30" fill="white">
+                            <path d="M12 9c-1.6 0-3.15.25-4.6.72v3.1c0 .39-.23.74-.56.9-.98.49-1.87 1.12-2.66 1.85-.18.18-.43.28-.7.28-.28 0-.53-.11-.71-.29L.29 13.08c-.18-.17-.29-.42-.29-.7 0-.28.11-.53.29-.71C3.34 8.78 7.46 7 12 7s8.66 1.78 11.71 4.67c.18.18.29.43.29.71 0 .28-.11.53-.29.71l-2.48 2.48c-.18.18-.43.29-.71.29-.27 0-.52-.11-.7-.28-.79-.74-1.69-1.36-2.67-1.85-.33-.16-.56-.5-.56-.9v-3.1C15.15 9.25 13.6 9 12 9z"/>
+                        </svg>
+                    </div>
+                    <span class="btn-label">Decline</span>
+                </button>
+                
+                <button class="modern-call-btn accept-btn" onclick="acceptIncomingCall()">
+                    <div class="btn-icon-wrapper">
+                        <svg viewBox="0 0 24 24" width="30" height="30" fill="white">
+                            <path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56-.35-.12-.74-.03-1.01.24l-1.57 1.97c-2.83-1.35-5.48-3.9-6.89-6.83l1.95-1.66c.27-.28.35-.67.24-1.02-.37-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z"/>
+                        </svg>
+                    </div>
+                    <span class="btn-label">Accept</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Call Container (Video & Audio) -->
+    <div id="callContainer" style="display: none;">
+        <!-- Video Call UI -->
+        <div id="videoCallContainer" style="display: none;">
+            <div class="video-call-wrapper">
+                <video id="remoteVideoElement" autoplay playsinline class="remote-video"></video>
+                <video id="localVideoElement" autoplay muted playsinline class="local-video"></video>
+                
+                <div class="call-info">
+                    <span id="callStatus">Connecting...</span>
+                </div>
+
+                <div class="video-controls">
+                    <button class="control-btn" id="muteBtn" onclick="toggleMuteCall()" title="Mute">
+                        <svg viewBox="0 0 24 24" width="24" height="24" fill="white">
+                            <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+                            <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                        </svg>
+                    </button>
+
+                    <button class="control-btn mobile-only" id="flipCameraBtn" onclick="flipCamera()" title="Flip Camera" style="display: none;">
+                        <svg viewBox="0 0 24 24" width="24" height="24" fill="white">
+                            <path d="M20 5h-3.17L15 3H9L7.17 5H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-8 13c-2.76 0-5-2.24-5-5H5l2.5-2.5L10 13H8c0 2.21 1.79 4 4 4s4-1.79 4-4h-2l2.5-2.5L19 11h-2c0 2.76-2.24 5-5 5z"/>
+                        </svg>
+                    </button>
+                    
+                    <button class="control-btn end-btn" onclick="endCurrentCall()" title="End Call">
+                        <svg viewBox="0 0 24 24" width="28" height="28" fill="white">
+                            <path d="M12 9c-1.6 0-3.15.25-4.6.72v3.1c0 .39-.23.74-.56.9-.98.49-1.87 1.12-2.66 1.85-.18.18-.43.28-.7.28-.28 0-.53-.11-.71-.29L.29 13.08c-.18-.17-.29-.42-.29-.7 0-.28.11-.53.29-.71C3.34 8.78 7.46 7 12 7s8.66 1.78 11.71 4.67c.18.18.29.43.29.71 0 .28-.11.53-.29.71l-2.48 2.48c-.18.18-.43.29-.71.29-.27 0-.52-.11-.7-.28-.79-.74-1.69-1.36-2.67-1.85-.33-.16-.56-.5-.56-.9v-3.1C15.15 9.25 13.6 9 12 9z"/>
+                        </svg>
+                    </button>
+                    
+                    <button class="control-btn" id="videoBtn" onclick="toggleVideoCall()" title="Toggle Video">
+                        <svg viewBox="0 0 24 24" width="24" height="24" fill="white">
+                            <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Audio Call UI -->
+        <div id="audioCallContainer" style="display: none;">
+            <div class="audio-call-wrapper">
+                <div class="audio-call-content">
+                    <div class="caller-avatar large">
+                        <div class="avatar-circle xlarge" style="background: linear-gradient(135deg, #0047AB, #0066CC);">
+                            <svg viewBox="0 0 24 24" width="80" height="80" fill="white">
+                                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                            </svg>
+                        </div>
+                        <div class="sound-waves">
+                            <div class="wave"></div>
+                            <div class="wave"></div>
+                            <div class="wave"></div>
+                            <div class="wave"></div>
+                        </div>
+                    </div>
+                    
+                    <h2 id="audioCallUserName">User</h2>
+                    <p id="audioCallStatus">Calling...</p>
+                </div>
+
+                <div class="audio-controls">
+                    <button class="control-btn" id="audioMuteBtn" onclick="toggleMuteCall()" title="Mute">
+                        <svg viewBox="0 0 24 24" width="24" height="24" fill="white">
+                            <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+                            <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                        </svg>
+                    </button>
+                    
+                    <button class="control-btn end-btn" onclick="endCurrentCall()" title="End Call">
+                        <svg viewBox="0 0 24 24" width="32" height="32" fill="white">
+                            <path d="M12 9c-1.6 0-3.15.25-4.6.72v3.1c0 .39-.23.74-.56.9-.98.49-1.87 1.12-2.66 1.85-.18.18-.43.28-.7.28-.28 0-.53-.11-.71-.29L.29 13.08c-.18-.17-.29-.42-.29-.7 0-.28.11-.53.29-.71C3.34 8.78 7.46 7 12 7s8.66 1.78 11.71 4.67c.18.18.29.43.29.71 0 .28-.11.53-.29.71l-2.48 2.48c-.18.18-.43.29-.71.29-.27 0-.52-.11-.7-.28-.79-.74-1.69-1.36-2.67-1.85-.33-.16-.56-.5-.56-.9v-3.1C15.15 9.25 13.6 9 12 9z"/>
+                        </svg>
+                    </button>
+                    
+                    <button class="control-btn" title="Speaker">
+                        <svg viewBox="0 0 24 24" width="24" height="24" fill="white">
+                            <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Room Code Modal -->
+    <div class="modal-overlay" id="roomModal">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeRoomModal()">&times;</button>
+            <h2>Connect Instantly</h2>
+            <p class="modal-subtitle">No login required • Secure peer-to-peer</p>
+            
+            <div class="modal-options">
+                <button class="modal-btn" onclick="createRoom()">
+                    <svg viewBox="0 0 24 24" width="32" height="32" fill="#0047AB">
+                        <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+                    </svg>
+                    <h3>Create Room</h3>
+                    <p>Generate a code to share</p>
+                </button>
+                
+                <button class="modal-btn" onclick="showJoinRoom()">
+                    <svg viewBox="0 0 24 24" width="32" height="32" fill="#0066CC">
+                        <path d="M10 17l5-5-5-5v10z"/>
+                    </svg>
+                    <h3>Join Room</h3>
+                    <p>Enter a room code</p>
+                </button>
+            </div>
+
+            <!-- Create Room View -->
+            <div class="room-view" id="createView" style="display:none;">
+                <div class="room-code-display">
+                    <label>Your Secure Room Code</label>
+                    <div class="code-box" id="roomCodeDisplay" style="font-size: 14px; word-break: break-all; padding: 12px;">------</div>
+                    <p class="code-hint">🔐 8-character secure code</p>
+                </div>
+                <div class="share-options">
+                    <button class="share-btn" onclick="copyRoomCode()">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                            <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                        </svg>
+                        Copy Code
+                    </button>
+                    <button class="share-btn" onclick="shareLink()">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                            <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/>
+                        </svg>
+                        Share Link
+                    </button>
+                </div>
+                <p style="font-size: 12px; color: #666; margin-top: 10px; text-align: center;">
+                    📱 On mobile: "Share Link" opens native share menu
+                </p>
+                <p class="waiting-text" id="waitingText">Waiting for someone to join...</p>
+            </div>
+
+            <!-- Join Room View -->
+            <div class="room-view" id="joinView" style="display:none;">
+                <label>Enter Room Code</label>
+                <input type="text" class="code-input" id="joinCodeInput" placeholder="Enter 6 or 16-character code" maxlength="32" style="font-size: 14px;">
+                <div style="font-size: 11px; color: #666; margin-top: -5px; margin-bottom: 10px;">
+                    💡 8-character codes for secure rooms
+                </div>
+                <button class="primary-btn" onclick="joinRoom()">Join Room</button>
+                <button class="secondary-btn" onclick="backToOptions()">Back</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Onboarding Tutorial Modal -->
+    <div class="modal-overlay" id="onboardingModal">
+        <div class="modal-content onboarding-modal">
+            <button class="modal-close" onclick="closeOnboarding()">&times;</button>
+            <div class="onboarding-content" id="onboardingContent">
+                <!-- Step 1 -->
+                <div class="onboarding-step active" data-step="1">
+                    <div class="onboarding-icon">
+                        <svg viewBox="0 0 24 24" width="80" height="80" fill="#0047AB">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                        </svg>
+                    </div>
+                    <h2>Welcome to RAOUFz!</h2>
+                    <p>Let's get you started with secure video and audio calling in just 3 simple steps.</p>
+                </div>
+                
+                <!-- Step 2 -->
+                <div class="onboarding-step" data-step="2">
+                    <div class="onboarding-icon">
+                        <svg viewBox="0 0 24 24" width="80" height="80" fill="#0047AB">
+                            <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+                        </svg>
+                    </div>
+                    <h2>Step 1: Create a Room</h2>
+                    <p>Click the <strong>+ button</strong> at the bottom right, then select <strong>"Create Room"</strong>. You'll get a unique code to share with your contact.</p>
+                    <div class="step-visual">
+                        <div class="visual-fab">+</div>
+                        <span class="arrow">→</span>
+                        <div class="visual-code">ABC123</div>
+                    </div>
+                </div>
+                
+                <!-- Step 3 -->
+                <div class="onboarding-step" data-step="3">
+                    <div class="onboarding-icon">
+                        <svg viewBox="0 0 24 24" width="80" height="80" fill="#0066CC">
+                            <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/>
+                        </svg>
+                    </div>
+                    <h2>Step 2: Share the Code</h2>
+                    <p>Send the room code to your contact via text, email, or any messaging app. They need this code to join your room.</p>
+                    <div class="step-visual">
+                        <span style="font-size: 14px;">📱 Text, Email, or Message</span>
+                    </div>
+                </div>
+                
+                <!-- Step 4 -->
+                <div class="onboarding-step" data-step="4">
+                    <div class="onboarding-icon">
+                        <svg viewBox="0 0 24 24" width="80" height="80" fill="#0047AB">
+                            <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/>
+                        </svg>
+                    </div>
+                    <h2>Step 3: Start Calling!</h2>
+                    <p>Once both users are in the same room, the chat window opens automatically. Now you can click the <strong>video</strong> or <strong>audio</strong> call buttons to connect!</p>
+                    <div class="step-visual">
+                        <span style="font-size: 14px;">🎥 Video Call &nbsp; | &nbsp; 📞 Audio Call</span>
+                    </div>
+                </div>
+                
+                <!-- Final Step -->
+                <div class="onboarding-step" data-step="5">
+                    <div class="onboarding-icon">
+                        <svg viewBox="0 0 24 24" width="80" height="80" fill="#00AA55">
+                            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                        </svg>
+                    </div>
+                    <h2>Important Tips</h2>
+                    <ul class="tips-list">
+                        <li>✅ Both users MUST be in the same room before calling</li>
+                        <li>✅ Allow camera/microphone permissions when prompted</li>
+                        <li>✅ Use HTTPS in production (browsers require it)</li>
+                        <li>✅ Best on Chrome, Edge, or Opera browsers</li>
+                        <li>✅ 8-character codes for secure rooms</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="onboarding-nav">
+                <button class="secondary-btn" id="onboardingBack" onclick="prevOnboardingStep()" style="visibility: hidden;">Back</button>
+                <div class="onboarding-dots">
+                    <span class="dot active" data-dot="1"></span>
+                    <span class="dot" data-dot="2"></span>
+                    <span class="dot" data-dot="3"></span>
+                    <span class="dot" data-dot="4"></span>
+                    <span class="dot" data-dot="5"></span>
+                </div>
+                <button class="primary-btn" id="onboardingNext" onclick="nextOnboardingStep()">Next</button>
+            </div>
+            
+            <div class="skip-tutorial">
+                <button onclick="skipOnboarding()">Skip Tutorial</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Device Test Modal -->
+    <div class="modal-overlay" id="deviceTestModal" style="display: none;">
+        <div class="modal-content device-test-modal">
+            <button class="modal-close" onclick="closeDeviceTest()">&times;</button>
+            <h2>Test Your Devices</h2>
+            <p class="modal-subtitle">Make sure your camera and microphone are working</p>
+            
+            <div class="device-test-container">
+                <div class="video-preview">
+                    <video id="testVideoElement" autoplay muted playsinline></video>
+                    <div class="test-overlay" id="testOverlay">
+                        <p>Click "Start Test" below</p>
+                    </div>
+                </div>
+                
+                <div class="audio-level-indicator">
+                    <label>Microphone Level</label>
+                    <div class="audio-meter">
+                        <div class="audio-level" id="audioLevelBar"></div>
+                    </div>
+                </div>
+                
+                <div class="device-test-actions">
+                    <button class="secondary-btn" id="startTestBtn" onclick="startDeviceTest()">Start Test</button>
+                    <button class="secondary-btn" id="stopTestBtn" onclick="stopDeviceTest()" style="display: none;">Stop Test</button>
+                    <button class="primary-btn" onclick="closeDeviceTest()">Done</button>
+                </div>
+                
+                <div class="device-tips">
+                    <p><strong>Troubleshooting:</strong></p>
+                    <ul>
+                        <li>Grant camera/microphone permissions when prompted</li>
+                        <li>Check your browser's site settings if blocked</li>
+                        <li>Make sure no other app is using your devices</li>
+                        <li>HTTPS is required (except on localhost)</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Navigation Bar -->
+    <nav class="bottom-nav" id="bottomNav">
+        <div class="bottom-nav-items">
+            <button class="nav-item active" onclick="showChatsView()">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 9h12v2H6V9zm8 5H6v-2h8v2zm4-6H6V6h12v2z"/>
+                </svg>
+                <span>Chats</span>
+                <span class="nav-badge">5</span>
+            </button>
+            <button class="nav-item" onclick="showStatusView()">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <circle cx="12" cy="12" r="10"/>
+                    <circle fill="rgba(255,255,255,0.3)" cx="12" cy="12" r="6"/>
+                </svg>
+                <span>Status</span>
+            </button>
+            <button class="nav-item" onclick="showCallsView()">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56-.35-.12-.74-.03-1.01.24l-1.57 1.97c-2.83-1.35-5.48-3.9-6.89-6.83l1.95-1.66c.27-.28.35-.67.24-1.02-.37-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z"/>
+                </svg>
+                <span>Calls</span>
+            </button>
+            <button class="nav-item" onclick="showProfileView()">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                </svg>
+                <span>Profile</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Floating Action Button for New Chat -->
+    <button class="new-chat-fab" id="newChatFab" onclick="toggleFabMenu()">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+            <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+        </svg>
+    </button>
+
+    <!-- Mobile Message Input - WhatsApp Style -->
+    <div class="whatsapp-input-container" id="mobileMessageInput">
+        <!-- Emoji Picker Popup (Above Input) -->
+        <div class="whatsapp-emoji-picker" id="mobileEmojiPicker" style="display: none;">
+            <div class="emoji-picker-header">
+                <span class="emoji-category active">😊 Smileys</span>
+            </div>
+            <div class="whatsapp-emoji-grid">
+                <span class="whatsapp-emoji-item" onclick="insertEmoji('😊')">😊</span>
+                <span class="whatsapp-emoji-item" onclick="insertEmoji('😂')">😂</span>
+                <span class="whatsapp-emoji-item" onclick="insertEmoji('🤣')">🤣</span>
+                <span class="whatsapp-emoji-item" onclick="insertEmoji('❤️')">❤️</span>
+                <span class="whatsapp-emoji-item" onclick="insertEmoji('😍')">😍</span>
+                <span class="whatsapp-emoji-item" onclick="insertEmoji('😘')">😘</span>
+                <span class="whatsapp-emoji-item" onclick="insertEmoji('👍')">👍</span>
+                <span class="whatsapp-emoji-item" onclick="insertEmoji('🙏')">🙏</span>
+                <span class="whatsapp-emoji-item" onclick="insertEmoji('😎')">😎</span>
+                <span class="whatsapp-emoji-item" onclick="insertEmoji('🤔')">🤔</span>
+                <span class="whatsapp-emoji-item" onclick="insertEmoji('😢')">😢</span>
+                <span class="whatsapp-emoji-item" onclick="insertEmoji('😭')">😭</span>
+                <span class="whatsapp-emoji-item" onclick="insertEmoji('�')">�</span>
+                <span class="whatsapp-emoji-item" onclick="insertEmoji('🥰')">🥰</span>
+                <span class="whatsapp-emoji-item" onclick="insertEmoji('🤩')">🤩</span>
+                <span class="whatsapp-emoji-item" onclick="insertEmoji('�')">�</span>
+                <span class="whatsapp-emoji-item" onclick="insertEmoji('�')">�</span>
+                <span class="whatsapp-emoji-item" onclick="insertEmoji('🎉')">🎉</span>
+                <span class="whatsapp-emoji-item" onclick="insertEmoji('🔥')">🔥</span>
+                <span class="whatsapp-emoji-item" onclick="insertEmoji('💯')">💯</span>
+                <span class="whatsapp-emoji-item" onclick="insertEmoji('✨')">✨</span>
+                <span class="whatsapp-emoji-item" onclick="insertEmoji('⭐')">⭐</span>
+                <span class="whatsapp-emoji-item" onclick="insertEmoji('�')">�</span>
+                <span class="whatsapp-emoji-item" onclick="insertEmoji('�')">�</span>
+                <span class="whatsapp-emoji-item" onclick="insertEmoji('�')">�</span>
+                <span class="whatsapp-emoji-item" onclick="insertEmoji('�')">�</span>
+                <span class="whatsapp-emoji-item" onclick="insertEmoji('🎊')">🎊</span>
+                <span class="whatsapp-emoji-item" onclick="insertEmoji('🙌')">🙌</span>
+                <span class="whatsapp-emoji-item" onclick="insertEmoji('�')">�</span>
+                <span class="whatsapp-emoji-item" onclick="insertEmoji('✌️')">✌️</span>
+            </div>
+        </div>
+        
+        <!-- Input Bar -->
+        <div class="whatsapp-input-bar">
+            <button class="whatsapp-icon-btn emoji-btn" onclick="toggleMobileEmojiPicker()" title="Emoji">
+                <svg viewBox="0 0 24 24" width="26" height="26">
+                    <path fill="currentColor" d="M9.153 11.603c.795 0 1.439-.879 1.439-1.962s-.644-1.962-1.439-1.962-1.439.879-1.439 1.962.644 1.962 1.439 1.962zm-3.204 1.362c-.026-.307-.131 5.218 6.063 5.551 6.066-.25 6.066-5.551 6.066-5.551-6.078 1.416-12.129 0-12.129 0zm11.363 1.108s-.669 1.959-5.051 1.959c-3.505 0-5.388-1.164-5.607-1.959 0 0 5.912 1.055 10.658 0zM11.804 1.011C5.609 1.011.978 6.033.978 12.228s4.826 10.761 11.021 10.761S23.02 18.423 23.02 12.228c.001-6.195-5.021-11.217-11.216-11.217zM12 21.354c-5.273 0-9.381-3.886-9.381-9.159s3.942-9.548 9.215-9.548 9.548 4.275 9.548 9.548c-.001 5.272-4.109 9.159-9.382 9.159zm3.108-9.751c.795 0 1.439-.879 1.439-1.962s-.644-1.962-1.439-1.962-1.439.879-1.439 1.962.644 1.962 1.439 1.962z"/>
+                </svg>
+            </button>
+            
+            <div class="whatsapp-input-wrapper">
+                <textarea 
+                    placeholder="Message" 
+                    id="mobileMessageInputField"
+                    class="whatsapp-input whatsapp-textarea"
+                    autocomplete="off"
+                    rows="1"
+                    maxlength="4096"
+                ></textarea>
+            </div>
+            
+            <button class="whatsapp-send-btn" onclick="sendMobileMessage()">
+                <svg viewBox="0 0 24 24" width="24" height="24">
+                    <path fill="white" d="M1.101 21.757L23.8 12.028 1.101 2.3l.011 7.912 13.623 1.816-13.623 1.817-.011 7.912z"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Hidden Audio Element for Welcome Sound -->
+    <audio id="welcomeAudio" src="WELCOME.mp3" preload="auto"></audio>
+
+    <!-- Scripts -->
+    <script src="script.js"></script>
+    <script src="client.js"></script>
+    <script src="webrtc-handler.js"></script>
+    
+    <script>
+        // Welcome Audio Control Functions
+        let welcomeAudio = null;
+        
+        function initWelcomeAudio() {
+            welcomeAudio = document.getElementById('welcomeAudio');
+            
+            // Reset buttons when audio ends
+            welcomeAudio.addEventListener('ended', function() {
+                document.getElementById('playAudioBtn').style.display = 'block';
+                document.getElementById('stopAudioBtn').style.display = 'none';
+            });
+        }
+        
+        function playWelcomeAudio() {
+            if (!welcomeAudio) {
+                initWelcomeAudio();
+            }
+            
+            welcomeAudio.play().then(() => {
+                document.getElementById('playAudioBtn').style.display = 'none';
+                document.getElementById('stopAudioBtn').style.display = 'block';
+            }).catch((error) => {
+                console.error('Error playing audio:', error);
+            });
+        }
+        
+        function stopWelcomeAudio() {
+            if (welcomeAudio) {
+                welcomeAudio.pause();
+                welcomeAudio.currentTime = 0;
+                document.getElementById('playAudioBtn').style.display = 'block';
+                document.getElementById('stopAudioBtn').style.display = 'none';
+            }
+        }
+        
+        // Initialize audio on page load
+        window.addEventListener('DOMContentLoaded', initWelcomeAudio);
+        
+        // Production error handling
+        window.addEventListener('error', function(e) {
+            console.error('Error:', e.error);
+        });
+        
+        // Check HTTPS in production
+        if (location.hostname !== 'localhost' && location.hostname !== '127.0.0.1' && location.protocol !== 'https:') {
+            console.warn('⚠️ HTTPS required for camera/microphone access in production');
+        }
+    </script>
+</body>
+</html>
