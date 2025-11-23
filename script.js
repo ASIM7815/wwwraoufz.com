@@ -518,24 +518,37 @@ window.addEventListener('load', () => {
         // Store room code globally
         window.currentRoomCode = roomCode;
         currentRoomCode = roomCode;
+        currentRoomId = roomCode;
         
-        // Auto-fill the room code
+        // Auto-fill the room code (in case user needs it later)
         document.getElementById('joinCodeInput').value = roomCode;
         
-        // Show join room view
-        toggleFabMenu();
-        showJoinRoom();
-        
-        // Show helpful message
-        const joinInput = document.getElementById('joinCodeInput');
-        if (joinInput) {
-            joinInput.focus();
-            joinInput.select();
-        }
-        
-        // Optional: Show a toast/notification
         console.log('🔗 Room code detected from shared link!');
         console.log('🔑 Room code stored:', roomCode);
+        console.log('🚀 Auto-joining room...');
+        
+        // Automatically join the room without showing modal
+        // Wait a bit for socket to be ready
+        setTimeout(() => {
+            if (window.socket && window.socket.connected) {
+                console.log('📤 Auto-joining room:', roomCode);
+                window.socket.emit('joinRoom', { roomCode: roomCode, username: window.currentUser });
+                window.socket.roomCode = roomCode;
+            } else {
+                console.warn('⏳ Socket not ready, retrying...');
+                // Retry after a short delay
+                setTimeout(() => {
+                    if (window.socket && window.socket.connected) {
+                        console.log('📤 Auto-joining room (retry):', roomCode);
+                        window.socket.emit('joinRoom', { roomCode: roomCode, username: window.currentUser });
+                        window.socket.roomCode = roomCode;
+                    } else {
+                        console.error('❌ Socket still not ready, manual join may be needed');
+                        alert('Connection issue. Please try refreshing the page.');
+                    }
+                }, 2000);
+            }
+        }, 500);
     }
     
     // Initialize mobile layout
