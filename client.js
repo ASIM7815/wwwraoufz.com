@@ -113,6 +113,11 @@ socket.on('userJoinedRoom', (data) => {
     window.updateRoomInfo(data.roomCode, data.color, Object.keys(data.participants).length);
   }
   
+  // Enable call buttons when someone joins the room
+  if (typeof window.enableCallButtons === 'function') {
+    window.enableCallButtons();
+  }
+  
   setTimeout(() => {
     const modal = document.getElementById('roomModal');
     if (modal) {
@@ -134,6 +139,11 @@ socket.on('roomJoined', async (data) => {
   
   if (typeof window.updateConnectionStatus === 'function') {
     window.updateConnectionStatus('online');
+  }
+  
+  // Enable call buttons when room is joined
+  if (typeof window.enableCallButtons === 'function') {
+    window.enableCallButtons();
   }
   
   const modal = document.getElementById('roomModal');

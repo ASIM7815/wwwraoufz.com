@@ -565,10 +565,25 @@ function enableCallButtons() {
     const mobileVideoCallBtn = document.getElementById('mobileVideoCallBtn');
     const mobileAudioCallBtn = document.getElementById('mobileAudioCallBtn');
     
-    if (videoCallBtn) videoCallBtn.disabled = false;
-    if (audioCallBtn) audioCallBtn.disabled = false;
-    if (mobileVideoCallBtn) mobileVideoCallBtn.disabled = false;
-    if (mobileAudioCallBtn) mobileAudioCallBtn.disabled = false;
+    // Only enable if connected to socket and in a room
+    const canCall = window.socket && window.socket.connected && window.socket.roomCode;
+    
+    if (videoCallBtn) {
+        videoCallBtn.disabled = !canCall;
+        videoCallBtn.title = canCall ? 'Start Video Call' : 'Join or create a room to call';
+    }
+    if (audioCallBtn) {
+        audioCallBtn.disabled = !canCall;
+        audioCallBtn.title = canCall ? 'Start Audio Call' : 'Join or create a room to call';
+    }
+    if (mobileVideoCallBtn) {
+        mobileVideoCallBtn.disabled = !canCall;
+        mobileVideoCallBtn.title = canCall ? 'Start Video Call' : 'Join or create a room to call';
+    }
+    if (mobileAudioCallBtn) {
+        mobileAudioCallBtn.disabled = !canCall;
+        mobileAudioCallBtn.title = canCall ? 'Start Audio Call' : 'Join or create a room to call';
+    }
 }
 
 function disableCallButtons() {
@@ -577,10 +592,22 @@ function disableCallButtons() {
     const mobileVideoCallBtn = document.getElementById('mobileVideoCallBtn');
     const mobileAudioCallBtn = document.getElementById('mobileAudioCallBtn');
     
-    if (videoCallBtn) videoCallBtn.disabled = true;
-    if (audioCallBtn) audioCallBtn.disabled = true;
-    if (mobileVideoCallBtn) mobileVideoCallBtn.disabled = true;
-    if (mobileAudioCallBtn) mobileAudioCallBtn.disabled = true;
+    if (videoCallBtn) {
+        videoCallBtn.disabled = true;
+        videoCallBtn.title = 'Join or create a room to call';
+    }
+    if (audioCallBtn) {
+        audioCallBtn.disabled = true;
+        audioCallBtn.title = 'Join or create a room to call';
+    }
+    if (mobileVideoCallBtn) {
+        mobileVideoCallBtn.disabled = true;
+        mobileVideoCallBtn.title = 'Join or create a room to call';
+    }
+    if (mobileAudioCallBtn) {
+        mobileAudioCallBtn.disabled = true;
+        mobileAudioCallBtn.title = 'Join or create a room to call';
+    }
 }
 
 // All UI and connection functions implemented
@@ -862,6 +889,8 @@ window.stopDeviceTest = stopDeviceTest;
 window.showHelpTutorial = showHelpTutorial;
 window.startVideoCall = startVideoCall;
 window.startAudioCall = startAudioCall;
+window.enableCallButtons = enableCallButtons;
+window.disableCallButtons = disableCallButtons;
 
 // Mobile Emoji Picker Functions
 function toggleMobileEmojiPicker() {

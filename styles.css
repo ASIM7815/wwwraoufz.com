@@ -876,6 +876,67 @@ body::before {
     gap: 15px;
 }
 
+/* Call buttons styling */
+.call-btn {
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Pulse animation when call button becomes enabled */
+@keyframes callButtonPulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(0, 102, 204, 0.7);
+    }
+    50% {
+        box-shadow: 0 0 0 8px rgba(0, 102, 204, 0);
+    }
+}
+
+.call-btn:not([disabled]) {
+    animation: callButtonPulse 2s ease-in-out 3;
+}
+
+.call-btn:not([disabled]):hover {
+    background: linear-gradient(135deg, #0047AB, #0066CC);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 71, 171, 0.4);
+    animation: none;
+}
+
+.call-btn:not([disabled]):active {
+    transform: translateY(0);
+}
+
+.call-btn[disabled] {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.call-btn svg {
+    transition: all 0.3s ease;
+}
+
+.call-btn:not([disabled]):hover svg {
+    filter: drop-shadow(0 0 4px rgba(0, 102, 204, 0.6));
+}
+
+/* Specific call button colors */
+.call-btn:nth-child(1):not([disabled]):hover {
+    background: linear-gradient(135deg, #00AA55, #00CC66);
+    box-shadow: 0 4px 12px rgba(0, 170, 85, 0.4);
+}
+
+.call-btn:nth-child(1):not([disabled]):hover svg {
+    filter: drop-shadow(0 0 4px rgba(0, 204, 102, 0.6));
+}
+
+.call-btn:nth-child(2):not([disabled]):hover {
+    background: linear-gradient(135deg, #0047AB, #0066CC);
+    box-shadow: 0 4px 12px rgba(0, 102, 204, 0.4);
+}
+
 /* Messages Area */
 .messages-area {
     flex: 1;
