@@ -350,11 +350,31 @@ class WebRTCHandler {
         document.body.appendChild(notification);
         setTimeout(() => notification.remove(), 3000);
 
+        // Vibrate on mobile
         if (navigator.vibrate) {
-            navigator.vibrate(200);
+            navigator.vibrate([200, 100, 200, 100, 200]);
         }
-
-        await this.acceptCall();
+        
+        // Play ringtone if available
+        const ringtone = document.getElementById('ringtone');
+        if (ringtone) {
+            ringtone.loop = true;
+            ringtone.play().catch(e => this.log('Ringtone play failed:', e));
+        }
+        
+        // Show incoming call modal (DO NOT auto-accept)
+        const modal = document.getElementById('incomingCallModal');
+        const callerNameEl = document.getElementById('incomingCallerName');
+        const callTypeEl = document.getElementById('incomingCallType');
+        
+        if (modal && callerNameEl && callTypeEl) {
+            callerNameEl.textContent = data.from;
+            callTypeEl.textContent = data.callType === 'video' ? 'Video Call' : 'Audio Call';
+            modal.style.display = 'flex';
+            this.log('✅ Incoming call modal shown - waiting for user action');
+        }
+        
+        // DO NOT call acceptCall() here - wait for user to click Accept button
     }
 
     
@@ -1172,11 +1192,19 @@ class WebRTCHandler {
 
     // Show call UI
     showCallUI() {
+        this.log('📺 Showing call UI for type:', this.callType);
+        
         const callContainer = document.getElementById('callContainer');
         const videoContainer = document.getElementById('videoCallContainer');
         const audioContainer = document.getElementById('audioCallContainer');
         
-        if (callContainer) callContainer.style.display = 'flex';
+        if (!callContainer) {
+            this.error('❌ callContainer element not found!');
+            return;
+        }
+        
+        callContainer.style.display = 'flex';
+        this.log('✅ callContainer displayed');
         
         // Add click listener to ensure video plays on mobile (user interaction required)
         this.ensureMediaPlayback();
@@ -1709,14 +1737,66 @@ window.startAudioCall = function() {
 };
 
 function acceptIncomingCall() {
+    console.log('✅ User clicked Accept Call');
+    
     if (window.webrtcHandler) {
+        // Hide incoming call modal
+        const modal = document.getElementById('incomingCallModal');
+        if (modal) {
+            modal.style.display = 'none';
+            console.log('✅ Modal hidden');
+        }
+        
+        // Stop ringtone
+        const ringtone = document.getElementById('ringtone');
+        if (ringtone) {
+            ringtone.pause();
+            ringtone.currentTime = 0;
+            ringtone.loop = false;
+            console.log('✅ Ringtone stopped');
+        }
+        
+        // Accept the call
         window.webrtcHandler.acceptCall();
+        console.log('✅ Accepting call...');
+    } else {
+        console.error('❌ WebRTC handler not initialized');
+        alert('WebRTC not ready. Please refresh the page.');
     }
 }
 
 function rejectIncomingCall() {
+    console.log('🚫 User clicked Reject Call');
+    
     if (window.webrtcHandler) {
+        // Hide incoming call modal
+        const modal = document.getElementById('incomingCallModal');
+        if (modal) {
+            modal.style.display = 'none';
+            console.log('✅ Modal hidden');
+        }
+        
+        // Stop ringtone
+        const ringtone = document.getElementById('ringtone');
+        if (ringtone) {
+            ringtone.pause();
+            ringtone.currentTime = 0;
+            ringtone.loop = false;
+            console.log('✅ Ringtone stopped');
+        }
+        
+        // Reject the call
         window.webrtcHandler.rejectCall();
+        console.log('✅ Call rejected');
+        
+        // Show brief notification
+        const notification = document.createElement('div');
+        notification.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#FF6B6B;color:white;padding:15px 25px;border-radius:10px;z-index:10000;font-size:14px;box-shadow:0 4px 12px rgba(0,0,0,0.3);';
+        notification.textContent = 'Call declined';
+        document.body.appendChild(notification);
+        setTimeout(() => notification.remove(), 2000);
+    } else {
+        console.error('❌ WebRTC handler not initialized');
     }
 }
 
