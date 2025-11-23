@@ -7,6 +7,8 @@ const { WebSocketServer } = require('ws');
 
 const app = express();
 const server = http.createServer(app);
+
+// Socket.IO for chat and room management
 const io = socketIo(server, { 
   cors: { 
     origin: "*",
@@ -25,38 +27,33 @@ const io = socketIo(server, {
   }
 });
 
-// WebSocket server for high-quality video streaming (non-WebRTC)
+// WebSocket server for HD video streaming
 const wss = new WebSocketServer({ 
   server,
   path: '/stream',
-  perMessageDeflate: false, // Disable compression for video chunks
+  perMessageDeflate: false,
   maxPayload: 10 * 1024 * 1024 // 10MB per message
 });
 
-// Trust proxy for HTTPS on Railway
+// Trust proxy for Railway
 app.set('trust proxy', 1);
 
-app.use(compression()); // Enable gzip compression
+app.use(compression());
 app.use(cors());
 app.use(express.json());
 app.use(express.static(__dirname));
 
-// Security headers for Railway deployment
+// Security headers
 app.use((req, res, next) => {
-  // Enable CORS for WebRTC
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-  
-  // Required headers for WebRTC on Railway
   res.header('X-Content-Type-Options', 'nosniff');
   res.header('X-Frame-Options', 'SAMEORIGIN');
   
-  // Handle preflight
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);
   }
-  
   next();
 });
 
@@ -65,34 +62,34 @@ app.use((req, res, next) => {
   const host = req.header('host');
   const proto = req.header('x-forwarded-proto');
   
-  // Force HTTPS in production (Railway provides this via proxy)
   if (process.env.RAILWAY_ENVIRONMENT && proto !== 'https') {
     return res.redirect(301, `https://${host}${req.url}`);
   }
   next();
 });
 
+// Data storage
 const messages = {};
 const users = {};
 const rooms = {};
+const streamRooms = new Map();
 
-// Rate limiting map: socketId -> { messageCount, lastReset }
+// Rate limiting
 const rateLimits = new Map();
-const RATE_LIMIT_WINDOW = 10000; // 10 seconds
-const MAX_MESSAGES_PER_WINDOW = 50; // Max 50 messages per 10 seconds
+const RATE_LIMIT_WINDOW = 10000;
+const MAX_MESSAGES_PER_WINDOW = 50;
 
-// Room cleanup configuration
-const ROOM_CLEANUP_INTERVAL = 60000; // Check every 60 seconds
-const ROOM_INACTIVITY_TIMEOUT = 1800000; // 30 minutes of inactivity
+// Room cleanup
+const ROOM_CLEANUP_INTERVAL = 60000;
+const ROOM_INACTIVITY_TIMEOUT = 1800000;
 
-// Color palette for participants (vibrant colors for easy distinction)
+// Participant colors
 const participantColors = [
   '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8',
   '#F7DC6F', '#BB8FCE', '#85C1E2', '#F8B195', '#C06C84',
   '#6C5B7B', '#F67280', '#355C7D', '#99B898', '#FECEAB'
 ];
 
-// Rate limiting helper
 function checkRateLimit(socketId) {
   const now = Date.now();
   const limit = rateLimits.get(socketId);
@@ -108,149 +105,134 @@ function checkRateLimit(socketId) {
   }
   
   if (limit.messageCount >= MAX_MESSAGES_PER_WINDOW) {
-    return false; // Rate limit exceeded
+    return false;
   }
   
   limit.messageCount++;
   return true;
 }
 
-// Room cleanup - remove inactive rooms
-setInterval(() => {
-  const now = Date.now();
-  Object.keys(rooms).forEach(roomCode => {
+function cleanupInactiveRooms() {
+  const now = new Date();
+  for (const roomCode in rooms) {
     const room = rooms[roomCode];
-    const participantCount = Object.keys(room.participants).length;
-    
-    // Delete empty rooms older than 5 minutes
-    if (participantCount === 0) {
-      const roomAge = now - new Date(room.createdAt).getTime();
-      if (roomAge > 300000) { // 5 minutes
-        console.log(`🗑️ Auto-cleanup: Removing empty room ${roomCode}`);
-        delete rooms[roomCode];
-      }
+    if (now - room.lastActivity > ROOM_INACTIVITY_TIMEOUT) {
+      console.log(`🧹 Cleaning up inactive room: ${roomCode}`);
+      delete rooms[roomCode];
+      delete messages[roomCode];
     }
-    
-    // Mark rooms with no recent activity
-    if (room.lastActivity) {
-      const inactiveTime = now - new Date(room.lastActivity).getTime();
-      if (inactiveTime > ROOM_INACTIVITY_TIMEOUT && participantCount === 0) {
-        console.log(`🗑️ Auto-cleanup: Removing inactive room ${roomCode}`);
-        delete rooms[roomCode];
-      }
-    }
-  });
-  
-  // Cleanup old rate limit entries
-  rateLimits.forEach((value, key) => {
-    if (now - value.lastReset > RATE_LIMIT_WINDOW * 2) {
-      rateLimits.delete(key);
-    }
-  });
-}, ROOM_CLEANUP_INTERVAL);
+  }
+}
 
-app.get('/api/messages/:chatId', (req, res) => {
-  // Messages are not stored on server for privacy
-  res.json([]);
-});
+setInterval(cleanupInactiveRooms, ROOM_CLEANUP_INTERVAL);
 
-app.get('/api/users', (req, res) => {
-  res.json(Object.values(users));
-});
-
+// Socket.IO connection handling
 io.on('connection', (socket) => {
-  console.log('User connected:', socket.id);
-
-  socket.on('join', (username) => {
-    socket.username = username;
-    users[username] = { username, online: true };
-    io.emit('userStatus', { username, online: true });
-  });
-
-  socket.on('sendMessage', (data) => {
-    // Rate limiting check
-    if (!checkRateLimit(socket.id)) {
-      socket.emit('rate-limit-exceeded', { 
-        message: 'Sending too many messages. Please slow down.' 
-      });
+  console.log('✅ User connected:', socket.id);
+  
+  socket.on('create-room', ({ roomCode, username }) => {
+    if (rooms[roomCode]) {
+      socket.emit('room-exists', { roomCode });
       return;
     }
     
-    const chatId = data.chatId || socket.roomCode;
-    const message = { ...data, timestamp: new Date() };
+    const userColor = participantColors[Math.floor(Math.random() * participantColors.length)];
     
-    if (socket.roomCode) {
-      // Update room activity
-      if (rooms[socket.roomCode]) {
-        rooms[socket.roomCode].lastActivity = new Date();
-      }
-      io.to(socket.roomCode).emit('newMessage', message);
-    } else {
-      io.emit('newMessage', message);
-    }
-  });
-
-  socket.on('createRoom', (roomCode) => {
-    rooms[roomCode] = { 
-      creator: socket.id, 
-      participants: {},
+    rooms[roomCode] = {
+      creator: socket.id,
+      participants: {
+        [socket.id]: { username, color: userColor, joinedAt: new Date() }
+      },
       createdAt: new Date(),
       lastActivity: new Date()
     };
     
-    const color = participantColors[0];
-    rooms[roomCode].participants[socket.id] = {
-      socketId: socket.id,
-      username: socket.username || 'User',
-      color: color,
-      joinedAt: new Date()
+    messages[roomCode] = [];
+    socket.join(roomCode);
+    socket.roomCode = roomCode;
+    socket.username = username;
+    
+    socket.emit('room-created', { 
+      roomCode, 
+      participants: rooms[roomCode].participants,
+      color: userColor
+    });
+    
+    console.log(`🏠 Room created: ${roomCode} by ${username}`);
+  });
+  
+  socket.on('join-room', ({ roomCode, username }) => {
+    if (!rooms[roomCode]) {
+      socket.emit('room-not-found', { roomCode });
+      return;
+    }
+    
+    const room = rooms[roomCode];
+    const userColor = participantColors[Math.floor(Math.random() * participantColors.length)];
+    
+    room.participants[socket.id] = { 
+      username, 
+      color: userColor, 
+      joinedAt: new Date() 
     };
+    room.lastActivity = new Date();
     
     socket.join(roomCode);
     socket.roomCode = roomCode;
-    socket.emit('roomCreated', { 
+    socket.username = username;
+    
+    socket.emit('room-joined', { 
       roomCode, 
-      color,
-      participants: rooms[roomCode].participants
+      participants: room.participants, 
+      messages: messages[roomCode] || [],
+      color: userColor
     });
+    
+    socket.to(roomCode).emit('participant-joined', { 
+      socketId: socket.id,
+      username,
+      color: userColor,
+      roomCode,
+      participants: room.participants
+    });
+    
+    console.log(`👤 ${username} joined room: ${roomCode}`);
   });
-
-  socket.on('joinRoom', ({ roomCode, username }) => {
+  
+  socket.on('send-message', ({ roomCode, message, username }) => {
+    if (!checkRateLimit(socket.id)) {
+      socket.emit('rate-limited', { message: 'Too many messages. Please slow down.' });
+      return;
+    }
+    
+    if (!messages[roomCode]) messages[roomCode] = [];
+    
+    const messageData = {
+      id: Date.now(),
+      username,
+      message,
+      timestamp: new Date(),
+      socketId: socket.id,
+      color: rooms[roomCode]?.participants[socket.id]?.color || '#0066CC'
+    };
+    
+    messages[roomCode].push(messageData);
+    
+    if (messages[roomCode].length > 1000) {
+      messages[roomCode] = messages[roomCode].slice(-1000);
+    }
+    
+    io.to(roomCode).emit('new-message', messageData);
+    
     if (rooms[roomCode]) {
-      socket.join(roomCode);
-      socket.roomCode = roomCode;
-      socket.username = username || 'User';
-      
-      const participantCount = Object.keys(rooms[roomCode].participants).length;
-      const color = participantColors[participantCount % participantColors.length];
-      
-      rooms[roomCode].participants[socket.id] = {
-        socketId: socket.id,
-        username: username || 'User',
-        color: color,
-        joinedAt: new Date()
-      };
       rooms[roomCode].lastActivity = new Date();
-      
-      socket.to(roomCode).emit('userJoinedRoom', { 
-        roomCode, 
-        username,
-        socketId: socket.id,
-        color,
-        participants: rooms[roomCode].participants
-      });
-      
-      socket.emit('roomJoined', { 
-        roomCode,
-        color,
-        participants: rooms[roomCode].participants
-      });
-    } else {
-      socket.emit('roomNotFound');
     }
   });
-
-  // WebRTC Video/Audio Call Signaling
+  
+  socket.on('typing', ({ roomCode, username, isTyping }) => {
+    socket.to(roomCode).emit('user-typing', { username, isTyping });
+  });
+  
   socket.on('initiate-call', ({ roomCode, callType, from }) => {
     const room = rooms[roomCode];
     if (room) {
@@ -264,86 +246,24 @@ io.on('connection', (socket) => {
       });
     }
   });
-
-  socket.on('join-call', ({ roomCode }) => {
-    const room = rooms[roomCode];
-    if (room) {
-      room.lastActivity = new Date();
-      socket.to(roomCode).emit('participant-joined-call', {
-        socketId: socket.id,
-        username: socket.username || 'User',
-        color: room.participants[socket.id]?.color
-      });
-    }
-  });
-
+  
   socket.on('accept-call', ({ roomCode }) => {
     if (rooms[roomCode]) rooms[roomCode].lastActivity = new Date();
     socket.to(roomCode).emit('call-accepted', { roomCode });
   });
-
+  
   socket.on('reject-call', ({ roomCode }) => {
     socket.to(roomCode).emit('call-rejected', { roomCode });
   });
-
-  socket.on('webrtc-offer', ({ roomCode, offer, targetSocketId }) => {
-    if (rooms[roomCode]) rooms[roomCode].lastActivity = new Date();
-    if (targetSocketId) {
-      io.to(targetSocketId).emit('webrtc-offer', { 
-        offer, 
-        fromSocketId: socket.id,
-        roomCode 
-      });
-    } else {
-      socket.to(roomCode).emit('webrtc-offer', { 
-        offer,
-        fromSocketId: socket.id,
-        roomCode 
-      });
-    }
-  });
-
-  socket.on('webrtc-answer', ({ roomCode, answer, targetSocketId }) => {
-    if (rooms[roomCode]) rooms[roomCode].lastActivity = new Date();
-    if (targetSocketId) {
-      io.to(targetSocketId).emit('webrtc-answer', { 
-        answer,
-        fromSocketId: socket.id,
-        roomCode 
-      });
-    } else {
-      socket.to(roomCode).emit('webrtc-answer', { 
-        answer,
-        fromSocketId: socket.id,
-        roomCode 
-      });
-    }
-  });
-
-  socket.on('webrtc-ice-candidate', ({ roomCode, candidate, targetSocketId }) => {
-    if (targetSocketId) {
-      io.to(targetSocketId).emit('webrtc-ice-candidate', { 
-        candidate,
-        fromSocketId: socket.id,
-        roomCode 
-      });
-    } else {
-      socket.to(roomCode).emit('webrtc-ice-candidate', { 
-        candidate,
-        fromSocketId: socket.id,
-        roomCode 
-      });
-    }
-  });
-
+  
   socket.on('end-call', ({ roomCode }) => {
     socket.to(roomCode).emit('call-ended', { roomCode });
   });
-
+  
   socket.on('clearRoomChat', ({ roomCode, username }) => {
     io.to(roomCode).emit('clearChat', { roomCode, username });
   });
-
+  
   socket.on('disconnect', () => {
     if (socket.roomCode && rooms[socket.roomCode]) {
       const room = rooms[socket.roomCode];
@@ -363,29 +283,12 @@ io.on('connection', (socket) => {
       }
     }
     
-    // Cleanup rate limit entry
     rateLimits.delete(socket.id);
+    console.log('❌ User disconnected:', socket.id);
   });
 });
 
-// Health check endpoint for Railway
-app.get('/health', (req, res) => {
-  res.status(200).json({ 
-    status: 'healthy',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    protocol: req.protocol,
-    secure: req.secure || req.headers['x-forwarded-proto'] === 'https',
-    environment: process.env.RAILWAY_ENVIRONMENT || 'development',
-    activeRooms: Object.keys(rooms).length,
-    activeConnections: io.engine.clientsCount,
-    streamingPeers: streamRooms.size
-  });
-});
-
-// WebSocket-based video streaming (no WebRTC)
-const streamRooms = new Map(); // roomCode -> Set of ws connections
-
+// WebSocket HD video streaming
 wss.on('connection', (ws, req) => {
   let currentRoom = null;
   let peerId = null;
@@ -394,14 +297,12 @@ wss.on('connection', (ws, req) => {
   
   ws.on('message', (data) => {
     try {
-      // Check if it's JSON control message or binary video chunk
       if (data instanceof Buffer || data instanceof ArrayBuffer) {
-        // Binary video chunk - relay to room peers
+        // Binary video chunk
         if (currentRoom && streamRooms.has(currentRoom)) {
           const peers = streamRooms.get(currentRoom);
           peers.forEach(peer => {
             if (peer.ws !== ws && peer.ws.readyState === 1) {
-              // Send with metadata header
               const header = Buffer.from(JSON.stringify({ 
                 type: 'video-chunk',
                 from: peerId,
@@ -427,7 +328,7 @@ wss.on('connection', (ws, req) => {
             streamRooms.get(currentRoom).add({ ws, peerId });
             console.log(`✅ ${peerId} joined stream room ${currentRoom}`);
             
-            // Notify others in room
+            // Notify others
             const peers = streamRooms.get(currentRoom);
             peers.forEach(peer => {
               if (peer.ws !== ws && peer.ws.readyState === 1) {
@@ -438,7 +339,7 @@ wss.on('connection', (ws, req) => {
               }
             });
             
-            // Send current peers list to new joiner
+            // Send peer list
             const peerList = Array.from(peers)
               .filter(p => p.ws !== ws)
               .map(p => p.peerId);
@@ -457,7 +358,6 @@ wss.on('connection', (ws, req) => {
                 }
               });
               
-              // Notify others
               peers.forEach(peer => {
                 if (peer.ws.readyState === 1) {
                   peer.ws.send(JSON.stringify({
@@ -470,22 +370,6 @@ wss.on('connection', (ws, req) => {
               if (peers.size === 0) {
                 streamRooms.delete(currentRoom);
               }
-            }
-            break;
-            
-          case 'stream-quality':
-            // Relay quality change to room
-            if (currentRoom && streamRooms.has(currentRoom)) {
-              const peers = streamRooms.get(currentRoom);
-              peers.forEach(peer => {
-                if (peer.ws !== ws && peer.ws.readyState === 1) {
-                  peer.ws.send(JSON.stringify({
-                    type: 'peer-quality-change',
-                    peerId: peerId,
-                    quality: message.quality
-                  }));
-                }
-              });
             }
             break;
         }
@@ -504,7 +388,6 @@ wss.on('connection', (ws, req) => {
         }
       });
       
-      // Notify others
       peers.forEach(peer => {
         if (peer.ws.readyState === 1) {
           peer.ws.send(JSON.stringify({
@@ -526,21 +409,34 @@ wss.on('connection', (ws, req) => {
   });
 });
 
-// API endpoint to check WebRTC compatibility
-app.get('/api/webrtc-config', (req, res) => {
-  res.json({
-    stunServers: [
-      'stun:stun.l.google.com:19302',
-      'stun:stun1.l.google.com:19302',
-      'stun:stun2.l.google.com:19302'
-    ],
-    environment: process.env.RAILWAY_ENVIRONMENT || 'development'
+// Health check
+app.get('/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    protocol: req.protocol,
+    secure: req.secure || req.headers['x-forwarded-proto'] === 'https',
+    environment: process.env.RAILWAY_ENVIRONMENT || 'development',
+    activeRooms: Object.keys(rooms).length,
+    activeConnections: io.engine.clientsCount,
+    streamingPeers: streamRooms.size
   });
 });
 
+// Start server
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`✓ Server running on port ${PORT}`);
-  console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🔒 HTTPS redirect: ${process.env.NODE_ENV === 'production' ? 'enabled' : 'disabled'}`);
+  console.log(`🌐 Environment: ${process.env.RAILWAY_ENVIRONMENT || 'development'}`);
+  console.log(`🔒 HTTPS redirect: ${process.env.RAILWAY_ENVIRONMENT ? 'enabled' : 'disabled'}`);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, closing server...');
+  server.close(() => {
+    console.log('Server closed');
+    process.exit(0);
+  });
 });
