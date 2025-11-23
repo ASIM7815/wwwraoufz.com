@@ -3135,10 +3135,36 @@ body::before {
         top: 80px;
         right: 15px;
     }
+    
+    /* Ensure video elements work on mobile */
+    .remote-video, .local-video {
+        -webkit-transform: translateZ(0);
+        transform: translateZ(0);
+        -webkit-backface-visibility: hidden;
+        backface-visibility: hidden;
+    }
+    
+    .video-call-wrapper {
+        width: 100vw;
+        height: 100vh;
+        height: calc(var(--vh, 1vh) * 100);
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+    }
+    
+    .remote-video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
 
     .video-controls, .audio-controls {
         bottom: 80px;
         gap: 15px;
+        padding: 0 20px;
     }
 
     .control-btn {
@@ -3155,6 +3181,7 @@ body::before {
         top: 15px;
         left: 15px;
         padding: 10px 15px;
+        font-size: 12px;
     }
 
     .call-modal {
@@ -3179,6 +3206,11 @@ body::before {
 
     #audioCallUserName {
         font-size: 24px;
+    }
+    
+    /* Show flip camera button on mobile */
+    .mobile-only {
+        display: inline-flex !important;
     }
 }
 

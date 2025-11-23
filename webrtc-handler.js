@@ -26,6 +26,10 @@ class WebRTCHandler {
         this.connectionQuality = new Map();
         this.qualityCheckInterval = null;
         
+        // Call timer
+        this.callStartTime = null;
+        this.callTimerInterval = null;
+        
         // STUN servers configuration
         this.configuration = {
             iceServers: [
@@ -948,6 +952,7 @@ class WebRTCHandler {
             localVideo.setAttribute('autoplay', 'true');
             localVideo.setAttribute('muted', 'true');
             localVideo.muted = true; // Local video should always be muted
+            localVideo.volume = 0; // Ensure no echo
             
             localVideo.srcObject = this.localStream;
             
@@ -960,6 +965,12 @@ class WebRTCHandler {
                     })
                     .catch(err => {
                         this.warn('⚠️ Local video autoplay failed, will play on user interaction:', err);
+                        // Retry on user interaction
+                        const playOnInteraction = () => {
+                            localVideo.play().catch(e => this.log('Local play retry:', e));
+                        };
+                        document.addEventListener('click', playOnInteraction, { once: true });
+                        document.addEventListener('touchstart', playOnInteraction, { once: true });
                     });
             }
             
@@ -977,10 +988,26 @@ class WebRTCHandler {
             remoteVideo.setAttribute('playsinline', 'true');
             remoteVideo.setAttribute('autoplay', 'true');
             
+            // CRITICAL: Ensure audio is NOT muted and volume is max
+            remoteVideo.muted = false;
+            remoteVideo.volume = 1.0;
+            
             // Check if stream has active tracks
             const videoTracks = this.remoteStream.getVideoTracks();
             const audioTracks = this.remoteStream.getAudioTracks();
             this.log(`📺 Remote stream tracks: ${videoTracks.length} video, ${audioTracks.length} audio`);
+            
+            // Enable all audio tracks explicitly
+            audioTracks.forEach(track => {
+                track.enabled = true;
+                this.log(`🔊 Audio track enabled: ${track.label}, readyState: ${track.readyState}`);
+            });
+            
+            // Enable all video tracks
+            videoTracks.forEach(track => {
+                track.enabled = true;
+                this.log(`📹 Video track enabled: ${track.label}, readyState: ${track.readyState}`);
+            });
             
             remoteVideo.srcObject = this.remoteStream;
             
@@ -991,6 +1018,11 @@ class WebRTCHandler {
                     playPromise
                         .then(() => {
                             this.log('✅ Remote video playing successfully');
+                            this.log(`🔊 Remote video muted: ${remoteVideo.muted}, volume: ${remoteVideo.volume}`);
+                            
+                            // Start call timer
+                            this.startCallTimer();
+                            
                             // Update UI to show connected
                             const callStatus = document.getElementById('callStatus');
                             const audioStatus = document.getElementById('audioCallStatus');
@@ -1000,9 +1032,18 @@ class WebRTCHandler {
                         .catch(err => {
                             this.warn('⚠️ Remote video play attempt failed:', err.name, err.message);
                             // Retry after user interaction
-                            document.addEventListener('click', () => {
-                                remoteVideo.play().catch(e => this.error('Manual play failed:', e));
-                            }, { once: true });
+                            const retryPlay = () => {
+                                remoteVideo.muted = false;
+                                remoteVideo.volume = 1.0;
+                                remoteVideo.play()
+                                    .then(() => {
+                                        this.log('✅ Remote video playing after user interaction');
+                                        this.startCallTimer();
+                                    })
+                                    .catch(e => this.error('Manual play failed:', e));
+                            };
+                            document.addEventListener('click', retryPlay, { once: true });
+                            document.addEventListener('touchstart', retryPlay, { once: true });
                         });
                 }
             };
@@ -1026,12 +1067,25 @@ class WebRTCHandler {
             const remoteVideo = document.getElementById('remoteVideoElement');
             
             if (localVideo && localVideo.paused) {
+                localVideo.muted = true;
+                localVideo.volume = 0;
                 localVideo.play().catch(e => this.log('Local play:', e.message));
             }
             
             if (remoteVideo && remoteVideo.paused) {
+                // CRITICAL: Ensure remote audio is NOT muted
+                remoteVideo.muted = false;
+                remoteVideo.volume = 1.0;
+                
                 remoteVideo.play()
-                    .then(() => this.log('✅ Remote video playing after user interaction'))
+                    .then(() => {
+                        this.log('✅ Remote video playing after user interaction');
+                        this.log(`🔊 Remote audio: muted=${remoteVideo.muted}, volume=${remoteVideo.volume}`);
+                        // Start timer after successful playback
+                        if (!this.callTimerInterval) {
+                            this.startCallTimer();
+                        }
+                    })
                     .catch(e => this.log('Remote play:', e.message));
             }
         };
@@ -1039,9 +1093,14 @@ class WebRTCHandler {
         // Try to play on any user interaction
         document.addEventListener('click', playMedia, { once: true });
         document.addEventListener('touchstart', playMedia, { once: true });
+        document.addEventListener('touchend', playMedia, { once: true });
         
         // Also try immediately
         setTimeout(playMedia, 100);
+        
+        // Try again after a delay for mobile
+        setTimeout(playMedia, 500);
+        setTimeout(playMedia, 1000);
     }
 
     // Show call UI
@@ -1116,6 +1175,7 @@ class WebRTCHandler {
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; color: white;">
                         <div>
                             <h2 style="margin: 0; font-size: 20px;">Group Video Call</h2>
+                            <p id="groupCallTimer" style="margin: 5px 0 0 0; font-size: 16px; font-weight: 600; color: #0066CC;">00:00</p>
                         </div>
                         <div style="display: flex; gap: 10px; align-items: center;">
                             <div id="participantsList" style="background: rgba(255,255,255,0.1); padding: 10px; border-radius: 8px; max-height: 300px; overflow-y: auto; min-width: 200px;"></div>
@@ -1342,7 +1402,54 @@ class WebRTCHandler {
         }
     }
 
-    // Timer functionality removed for better performance
+    // Start call timer
+    startCallTimer() {
+        if (this.callTimerInterval) return; // Already running
+        
+        this.callStartTime = Date.now();
+        this.callTimerInterval = setInterval(() => {
+            this.updateCallTimer();
+        }, 1000);
+        
+        this.log('⏱️ Call timer started');
+    }
+    
+    // Update call timer display
+    updateCallTimer() {
+        if (!this.callStartTime) return;
+        
+        const elapsed = Math.floor((Date.now() - this.callStartTime) / 1000);
+        const minutes = Math.floor(elapsed / 60);
+        const seconds = elapsed % 60;
+        const timeString = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        
+        // Update video call timer
+        const videoTimer = document.getElementById('callTimer');
+        if (videoTimer) {
+            videoTimer.textContent = timeString;
+        }
+        
+        // Update audio call timer
+        const audioTimer = document.getElementById('audioCallTimer');
+        if (audioTimer) {
+            audioTimer.textContent = timeString;
+        }
+        
+        // Update group call timer
+        const groupTimer = document.getElementById('groupCallTimer');
+        if (groupTimer) {
+            groupTimer.textContent = timeString;
+        }
+    }
+    
+    // Stop call timer
+    stopCallTimer() {
+        if (this.callTimerInterval) {
+            clearInterval(this.callTimerInterval);
+            this.callTimerInterval = null;
+        }
+        this.callStartTime = null;
+    }
 
     // End call
     endCall() {
@@ -1404,6 +1511,9 @@ class WebRTCHandler {
         this.isCaller = false;
         this.callType = null;
         this.remoteUserName = null;
+        
+        // Stop call timer
+        this.stopCallTimer();
         
         // Stop quality monitoring
         this.stopAllQualityMonitoring();
