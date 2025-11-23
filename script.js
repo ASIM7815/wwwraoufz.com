@@ -268,6 +268,13 @@ async function createRoom() {
         document.getElementById('roomCodeDisplay').textContent = roomCode;
         document.getElementById('waitingText').textContent = 'Share code to connect...';
         
+        // Generate and display shareable link
+        const shareableLink = `${window.location.origin}${window.location.pathname}?room=${roomCode}`;
+        const linkDisplay = document.getElementById('shareableLinkDisplay');
+        if (linkDisplay) {
+            linkDisplay.textContent = shareableLink;
+        }
+        
         // Send to server
         window.socket.emit('createRoom', roomCode);
         window.socket.roomCode = roomCode;
