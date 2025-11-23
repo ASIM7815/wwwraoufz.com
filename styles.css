@@ -876,70 +876,65 @@ body::before {
     gap: 15px;
 }
 
-/* Call buttons styling - Professional & Clean */
+/* Call buttons styling */
 .call-btn {
-    transition: background-color 0.2s ease, opacity 0.2s ease;
+    transition: all 0.3s ease;
     position: relative;
     overflow: hidden;
-    border-radius: 50%;
-    padding: 10px;
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+/* Pulse animation when call button becomes enabled */
+@keyframes callButtonPulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(0, 102, 204, 0.7);
+    }
+    50% {
+        box-shadow: 0 0 0 8px rgba(0, 102, 204, 0);
+    }
 }
 
 .call-btn:not([disabled]) {
-    background: rgba(0, 102, 204, 0.15);
-    border-color: rgba(0, 102, 204, 0.3);
+    animation: callButtonPulse 2s ease-in-out 3;
 }
 
 .call-btn:not([disabled]):hover {
-    background: rgba(0, 102, 204, 0.25);
-    border-color: rgba(0, 102, 204, 0.5);
+    background: linear-gradient(135deg, #0047AB, #0066CC);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 71, 171, 0.4);
+    animation: none;
 }
 
 .call-btn:not([disabled]):active {
-    background: rgba(0, 102, 204, 0.35);
+    transform: translateY(0);
 }
 
 .call-btn[disabled] {
-    opacity: 0.3;
+    opacity: 0.4;
     cursor: not-allowed;
     pointer-events: none;
-    background: rgba(255, 255, 255, 0.05);
-    border-color: rgba(255, 255, 255, 0.08);
 }
 
 .call-btn svg {
-    transition: none;
+    transition: all 0.3s ease;
+}
+
+.call-btn:not([disabled]):hover svg {
+    filter: drop-shadow(0 0 4px rgba(0, 102, 204, 0.6));
 }
 
 /* Specific call button colors */
-.call-btn:nth-child(1):not([disabled]) {
-    background: rgba(0, 170, 85, 0.15);
-    border-color: rgba(0, 170, 85, 0.3);
-}
-
 .call-btn:nth-child(1):not([disabled]):hover {
-    background: rgba(0, 170, 85, 0.25);
-    border-color: rgba(0, 170, 85, 0.5);
+    background: linear-gradient(135deg, #00AA55, #00CC66);
+    box-shadow: 0 4px 12px rgba(0, 170, 85, 0.4);
 }
 
-.call-btn:nth-child(1):not([disabled]):active {
-    background: rgba(0, 170, 85, 0.35);
-}
-
-.call-btn:nth-child(2):not([disabled]) {
-    background: rgba(0, 102, 204, 0.15);
-    border-color: rgba(0, 102, 204, 0.3);
+.call-btn:nth-child(1):not([disabled]):hover svg {
+    filter: drop-shadow(0 0 4px rgba(0, 204, 102, 0.6));
 }
 
 .call-btn:nth-child(2):not([disabled]):hover {
-    background: rgba(0, 102, 204, 0.25);
-    border-color: rgba(0, 102, 204, 0.5);
-}
-
-.call-btn:nth-child(2):not([disabled]):active {
-    background: rgba(0, 102, 204, 0.35);
+    background: linear-gradient(135deg, #0047AB, #0066CC);
+    box-shadow: 0 4px 12px rgba(0, 102, 204, 0.4);
 }
 
 /* Messages Area */
