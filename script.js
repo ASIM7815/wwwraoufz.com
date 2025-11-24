@@ -968,32 +968,25 @@ window.addEventListener('DOMContentLoaded', function() {
     checkForRoomCodeInURL();
 });
 
-// Check URL for room code and auto-fill
+// Check URL for room code and auto-join INVISIBLY (User B never sees the code)
 function checkForRoomCodeInURL() {
     const urlParams = new URLSearchParams(window.location.search);
     const roomCode = urlParams.get('room');
     
     if (roomCode) {
-        console.log('🔗 Room code detected in URL:', roomCode);
+        console.log('🔗 Room code detected in URL - Auto-joining silently...');
         
-        // Auto-fill the join room input
+        // INVISIBLE auto-fill (User B never sees this)
         const joinCodeInput = document.getElementById('joinCodeInput');
         if (joinCodeInput) {
             joinCodeInput.value = roomCode;
         }
         
-        // Show a notification
+        // INSTANT automatic join - NO prompts, NO confirmations
         setTimeout(() => {
-            const message = `🎉 Room code ${roomCode} detected! Click "+" then "Join Room" to connect.`;
-            if (confirm(message + '\n\nAuto-join now?')) {
-                openNewChatModal();
-                showJoinRoom();
-                // Auto-trigger join after a moment
-                setTimeout(() => {
-                    joinRoom();
-                }, 500);
-            }
-        }, 1000);
+            // Silently join the room
+            joinRoomSilently(roomCode);
+        }, 100); // Fraction of a second
     }
 }
 
@@ -1069,25 +1062,28 @@ async function createRoom() {
         document.getElementById('createView').style.display = 'block';
         document.getElementById('roomCodeDisplay').textContent = roomCode;
         
-        // Generate shareable link with pre-planned message
+        // Generate shareable link
         const shareableLink = `${window.location.origin}${window.location.pathname}?room=${roomCode}`;
-        const preMessage = `🎉 Join my video chat room!\n\n🔗 Click this link: ${shareableLink}\n\n🔑 Or enter code: ${roomCode}\n\n✨ No login required - instant connection!`;
         
-        // Update waiting text with shareable info
+        // Simplified UI - Only 3 options
         document.getElementById('waitingText').innerHTML = `
             <div style="text-align: center;">
-                <p style="font-size: 16px; margin-bottom: 15px;">✅ Room Created!</p>
-                <p style="font-size: 14px; color: rgba(255,255,255,0.8); margin-bottom: 20px;">Share this link or code:</p>
-                <div style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px; margin-bottom: 15px;">
-                    <p style="font-size: 12px; color: rgba(255,255,255,0.6); margin-bottom: 5px;">Link:</p>
-                    <p style="font-size: 12px; word-break: break-all; color: #00CC66;">${shareableLink}</p>
-                </div>
-                <button onclick="copyShareMessage()" style="width: 100%; background: #0066CC; color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: 600; margin-bottom: 10px;">
-                    📋 Copy Share Message
+                <p style="font-size: 18px; margin-bottom: 20px; color: #00CC66; font-weight: 600;">✅ Room Created!</p>
+                <p style="font-size: 14px; color: rgba(255,255,255,0.9); margin-bottom: 25px;">Choose how to share:</p>
+                
+                <button onclick="copyCode()" style="width: 100%; background: linear-gradient(135deg, #0066CC, #0047AB); color: white; border: none; padding: 15px; border-radius: 10px; cursor: pointer; font-weight: 600; font-size: 15px; margin-bottom: 12px; box-shadow: 0 4px 15px rgba(0,102,204,0.3); transition: all 0.3s;">
+                    📋 Copy Code
                 </button>
-                <button onclick="shareRoomDirectly()" style="width: 100%; background: #00AA55; color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: 600;">
-                    📤 Share via Apps
+                
+                <button onclick="copyShareLink()" style="width: 100%; background: linear-gradient(135deg, #00AA55, #008844); color: white; border: none; padding: 15px; border-radius: 10px; cursor: pointer; font-weight: 600; font-size: 15px; margin-bottom: 12px; box-shadow: 0 4px 15px rgba(0,170,85,0.3); transition: all 0.3s;">
+                    🔗 Copy Link
                 </button>
+                
+                <button onclick="shareRoomDirectly()" style="width: 100%; background: linear-gradient(135deg, #CC6600, #AA5500); color: white; border: none; padding: 15px; border-radius: 10px; cursor: pointer; font-weight: 600; font-size: 15px; box-shadow: 0 4px 15px rgba(204,102,0,0.3); transition: all 0.3s;">
+                    📤 Share Link
+                </button>
+                
+                <p style="font-size: 12px; color: rgba(255,255,255,0.5); margin-top: 20px;">Waiting for someone to join...</p>
             </div>
         `;
         
@@ -1109,17 +1105,62 @@ async function createRoom() {
     }
 }
 
-// Copy share message to clipboard
-function copyShareMessage() {
-    if (window.currentShareMessage) {
-        navigator.clipboard.writeText(window.currentShareMessage).then(() => {
-            alert('✅ Share message copied! Paste it in WhatsApp, SMS, or any app.');
+// Copy ONLY the room code (User A keeps code authority)
+function copyCode() {
+    if (currentRoomCode) {
+        navigator.clipboard.writeText(currentRoomCode).then(() => {
+            showToast('✅ Code copied: ' + currentRoomCode);
         }).catch(err => {
             console.error('Failed to copy:', err);
-            // Fallback
-            prompt('Copy this message:', window.currentShareMessage);
+            prompt('Copy this code:', currentRoomCode);
         });
     }
+}
+
+// Copy ONLY the shareable link (User B auto-joins)
+function copyShareLink() {
+    if (window.currentShareLink) {
+        navigator.clipboard.writeText(window.currentShareLink).then(() => {
+            showToast('✅ Link copied! Share it to connect instantly.');
+        }).catch(err => {
+            console.error('Failed to copy:', err);
+            prompt('Copy this link:', window.currentShareLink);
+        });
+    }
+}
+
+// Simple toast notification
+function showToast(message) {
+    // Remove existing toast
+    const existingToast = document.querySelector('.custom-toast');
+    if (existingToast) {
+        existingToast.remove();
+    }
+    
+    const toast = document.createElement('div');
+    toast.className = 'custom-toast';
+    toast.textContent = message;
+    toast.style.cssText = `
+        position: fixed;
+        bottom: 30px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: linear-gradient(135deg, #00AA55, #00CC66);
+        color: white;
+        padding: 15px 30px;
+        border-radius: 50px;
+        font-weight: 600;
+        font-size: 14px;
+        z-index: 100000;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        animation: slideUp 0.3s ease;
+    `;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.style.animation = 'fadeOut 0.3s ease';
+        setTimeout(() => toast.remove(), 300);
+    }, 2500);
 }
 
 // Share via Web Share API
@@ -1140,14 +1181,31 @@ function shareRoomDirectly() {
 }
 
 // Update room info card
-function updateRoomInfoCard(roomCode) {
+function updateRoomInfoCard(roomCode, hideCode = false) {
     const roomInfoCard = document.getElementById('roomInfoCard');
     const roomCodeDisplay = document.getElementById('roomCodeDisplay');
     const roomColorIndicator = document.getElementById('roomColorIndicator');
     
-    if (roomInfoCard && roomCodeDisplay) {
+    if (roomInfoCard) {
         roomInfoCard.style.display = 'block';
-        roomCodeDisplay.textContent = roomCode;
+        
+        if (hideCode) {
+            // User B joined via link - HIDE the code completely
+            const codeSection = roomCodeDisplay?.closest('div');
+            if (codeSection) {
+                codeSection.style.display = 'none';
+            }
+            // Change title to show they're a guest
+            const titleElement = roomInfoCard.querySelector('h3');
+            if (titleElement) {
+                titleElement.textContent = '🎉 Connected to Room';
+            }
+        } else {
+            // User A created room - SHOW the code
+            if (roomCodeDisplay) {
+                roomCodeDisplay.textContent = roomCode;
+            }
+        }
         
         // Random color for this room
         const colors = ['#0066CC', '#00AA55', '#CC6600', '#AA00CC', '#CC0066'];
@@ -1174,20 +1232,11 @@ function shareRoomLink() {
     shareRoomDirectly();
 }
 
-// Updated joinRoom function
-async function joinRoom() {
-    console.log('🎬 joinRoom function called');
+// Silent join function - NO alerts, NO prompts, INSTANT connection
+async function joinRoomSilently(roomCode) {
+    console.log('🔗 Silently joining room:', roomCode);
     
     try {
-        const code = document.getElementById('joinCodeInput').value.trim();
-        console.log('🔑 Joining with code:', code);
-        
-        if (code.length < 5) {
-            alert('Please enter a valid 5-digit room code');
-            return;
-        }
-        
-        const roomCode = code;
         currentRoomCode = roomCode;
         currentRoomId = roomCode;
         
@@ -1200,14 +1249,11 @@ async function joinRoom() {
         // Store the room creator's peer ID (which is the room code)
         window.remotePeerId = roomCode;
         
-        console.log('✅ Connected to PeerJS, ready to call:', roomCode);
+        console.log('✅ Silently connected to room:', roomCode);
         
-        // Close modal and show success
-        closeRoomModal();
-        
-        // Open chat for this room
+        // AUTOMATICALLY open chat (User B sees message section immediately)
         openChat(`Room ${roomCode}`);
-        updateRoomInfoCard(roomCode);
+        updateRoomInfoCard(roomCode, true); // true = hide code from User B
         
         // Update participants count
         const participantsCount = document.getElementById('participantsCount');
@@ -1215,8 +1261,34 @@ async function joinRoom() {
             participantsCount.textContent = '👥 2 participants (Connected!)';
         }
         
-        // Show success message
-        alert(`✅ Joined room ${roomCode}!\n\nYou can now:\n📞 Start audio call\n📹 Start video call\n💬 Send messages`);
+        // NO alerts - just silently connected!
+        console.log('🎉 User B connected silently - ready for calls!');
+        
+    } catch (error) {
+        console.error('❌ Failed to join room silently:', error);
+        // Only show error if connection fails
+        alert('Connection failed. Please try again.');
+    }
+}
+
+// Updated joinRoom function (for manual join via code entry)
+async function joinRoom() {
+    console.log('🎬 joinRoom function called');
+    
+    try {
+        const code = document.getElementById('joinCodeInput').value.trim();
+        console.log('🔑 Joining with code:', code);
+        
+        if (code.length < 5) {
+            alert('Please enter a valid 5-digit room code');
+            return;
+        }
+        
+        // Use silent join for consistency
+        await joinRoomSilently(code);
+        
+        // Close modal
+        closeRoomModal();
         
     } catch (error) {
         console.error('❌ Failed to join room:', error);
@@ -1573,8 +1645,10 @@ window.toggleVideo = toggleVideo;
 window.endCall = endCall;
 window.copyRoomLink = copyRoomLink;
 window.shareRoomLink = shareRoomLink;
-window.copyShareMessage = copyShareMessage;
 window.shareRoomDirectly = shareRoomDirectly;
+window.copyCode = copyCode;
+window.copyShareLink = copyShareLink;
+window.joinRoomSilently = joinRoomSilently;
 
 
 
