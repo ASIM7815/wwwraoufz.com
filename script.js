@@ -1,4 +1,4 @@
-// No Firebase - using custom backend
+// Frontend-only version - No backend required
 
 // Fix mobile viewport height
 (function() {
@@ -242,25 +242,13 @@ function updateRoomInfo(roomCode, color, participantCount) {
 async function createRoom() {
     console.log('🎬 createRoom function called');
     
-    if (!window.socket) {
-        console.error('❌ Socket not initialized');
-        alert('Connection not ready. Please refresh the page.');
-        return;
-    }
-    
-    if (!window.socket.connected) {
-        console.error('❌ Socket not connected');
-        alert('Not connected to server. Please refresh the page.');
-        return;
-    }
-    
     try {
         // Generate simple 8-character room code
         const roomCode = Math.random().toString(36).substring(2, 10).toUpperCase();
         currentRoomCode = roomCode;
         currentRoomId = roomCode;
         
-        console.log('📤 Sending createRoom to server:', roomCode);
+        console.log('📤 Room created:', roomCode);
         
         // Update UI
         document.querySelector('.modal-options').style.display = 'none';
@@ -275,11 +263,7 @@ async function createRoom() {
             linkDisplay.textContent = shareableLink;
         }
         
-        // Send to server
-        window.socket.emit('createRoom', roomCode);
-        window.socket.roomCode = roomCode;
-        
-        console.log('✅ Room creation request sent');
+        console.log('✅ Room created (frontend only)');
         
     } catch (error) {
         console.error('❌ Failed to create room:', error);
@@ -289,18 +273,6 @@ async function createRoom() {
 
 async function joinRoom() {
     console.log('🎬 joinRoom function called');
-    
-    if (!window.socket) {
-        console.error('❌ Socket not initialized');
-        alert('Connection not ready. Please refresh the page.');
-        return;
-    }
-    
-    if (!window.socket.connected) {
-        console.error('❌ Socket not connected');
-        alert('Not connected to server. Please refresh the page.');
-        return;
-    }
     
     try {
         const code = document.getElementById('joinCodeInput').value.trim();
@@ -315,13 +287,11 @@ async function joinRoom() {
         currentRoomCode = roomCode;
         currentRoomId = roomCode;
         
-        console.log('📤 Sending joinRoom to server:', roomCode);
+        console.log('✅ Room joined (frontend only):', roomCode);
         
-        // Send to server
-        window.socket.emit('joinRoom', { roomCode: roomCode, username: window.currentUser });
-        window.socket.roomCode = roomCode;
-        
-        console.log('✅ Room join request sent');
+        // Close modal and show success
+        closeRoomModal();
+        alert('Joined room: ' + roomCode + '\n\nNote: This is frontend-only mode.');
         
     } catch (error) {
         console.error('❌ Failed to join room:', error);
@@ -335,15 +305,27 @@ async function sendMessage() {
     if (message) {
         input.value = '';
         
-        // Send via Socket.io if connected
-        if (window.socket && window.socket.roomCode) {
-            window.socket.emit('sendMessage', {
-                chatId: window.socket.roomCode,
-                sender: window.currentUser || 'You',
-                text: message
-            });
-        }
+        // Display message locally (frontend-only)
+        addMessageToChat(window.currentUser || 'You', message);
+        console.log('Message sent (frontend-only):', message);
     }
+}
+
+// Helper function to display messages
+function addMessageToChat(sender, text) {
+    const chatMessages = document.getElementById('chatMessages');
+    if (!chatMessages) return;
+    
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'message sent';
+    messageDiv.innerHTML = `
+        <div class="message-bubble">
+            <div class="message-text">${text}</div>
+            <div class="message-time">${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+        </div>
+    `;
+    chatMessages.appendChild(messageDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
 async function sendMobileMessage() {
@@ -358,14 +340,9 @@ async function sendMobileMessage() {
             input.style.height = '20px';
         }
         
-        // Send via Socket.io if connected
-        if (window.socket && window.socket.roomCode) {
-            window.socket.emit('sendMessage', {
-                chatId: window.socket.roomCode,
-                sender: window.currentUser || 'You',
-                text: message
-            });
-        }
+        // Display message locally (frontend-only)
+        addMessageToChat(window.currentUser || 'You', message);
+        console.log('Mobile message sent (frontend-only):', message);
     }
 }
 
@@ -532,30 +509,12 @@ window.addEventListener('load', () => {
         
         console.log('🔗 Room code detected from shared link!');
         console.log('🔑 Room code stored:', roomCode);
-        console.log('🚀 Auto-joining room...');
+        console.log('✅ Room joined (frontend-only):', roomCode);
         
-        // Automatically join the room without showing modal
-        // Wait a bit for socket to be ready
-        setTimeout(() => {
-            if (window.socket && window.socket.connected) {
-                console.log('📤 Auto-joining room:', roomCode);
-                window.socket.emit('joinRoom', { roomCode: roomCode, username: window.currentUser });
-                window.socket.roomCode = roomCode;
-            } else {
-                console.warn('⏳ Socket not ready, retrying...');
-                // Retry after a short delay
-                setTimeout(() => {
-                    if (window.socket && window.socket.connected) {
-                        console.log('📤 Auto-joining room (retry):', roomCode);
-                        window.socket.emit('joinRoom', { roomCode: roomCode, username: window.currentUser });
-                        window.socket.roomCode = roomCode;
-                    } else {
-                        console.error('❌ Socket still not ready, manual join may be needed');
-                        alert('Connection issue. Please try refreshing the page.');
-                    }
-                }, 2000);
-            }
-        }, 500);
+        // Store room code locally
+        currentRoomCode = roomCode;
+        currentRoomId = roomCode;
+        alert('Joined room: ' + roomCode + '\\n\\nNote: This is frontend-only mode.');
     }
     
     // Initialize mobile layout
@@ -585,8 +544,8 @@ function enableCallButtons() {
     const mobileVideoCallBtn = document.getElementById('mobileVideoCallBtn');
     const mobileAudioCallBtn = document.getElementById('mobileAudioCallBtn');
     
-    // Only enable if connected to socket and in a room
-    const canCall = window.socket && window.socket.connected && window.socket.roomCode;
+    // Enable if in a room (frontend-only)
+    const canCall = currentRoomCode !== null;
     
     if (videoCallBtn) {
         videoCallBtn.disabled = !canCall;
@@ -628,25 +587,6 @@ function disableCallButtons() {
         mobileAudioCallBtn.disabled = true;
         mobileAudioCallBtn.title = 'Join or create a room to call';
     }
-}
-
-// Call functions - Socket.IO only
-function startVideoCall() {
-    console.log('📹 Starting video call...');
-    if (!currentRoomCode) {
-        alert('Please create or join a room first');
-        return;
-    }
-    alert('Video call feature - Coming soon! Room ready for connection.');
-}
-
-function startAudioCall() {
-    console.log('📞 Starting audio call...');
-    if (!currentRoomCode) {
-        alert('Please create or join a room first');
-        return;
-    }
-    alert('Audio call feature - Coming soon! Room ready for connection.');
 }
 
 // All UI and connection functions implemented
