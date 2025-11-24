@@ -305,9 +305,22 @@ async function sendMessage() {
     if (message) {
         input.value = '';
         
-        // Display message locally (frontend-only)
+        // Send via P2P data connection
+        if (dataConnection && dataConnection.open) {
+            dataConnection.send({
+                type: 'message',
+                text: message,
+                timestamp: Date.now()
+            });
+            console.log('✅ Message sent via P2P:', message);
+        } else {
+            console.warn('⚠️ No P2P connection - message not sent');
+            showToast('⚠️ Not connected to peer');
+            return;
+        }
+        
+        // Display message locally
         addMessageToChat(window.currentUser || 'You', message);
-        console.log('Message sent (frontend-only):', message);
     }
 }
 
@@ -340,9 +353,22 @@ async function sendMobileMessage() {
             input.style.height = '20px';
         }
         
-        // Display message locally (frontend-only)
+        // Send via P2P data connection
+        if (dataConnection && dataConnection.open) {
+            dataConnection.send({
+                type: 'message',
+                text: message,
+                timestamp: Date.now()
+            });
+            console.log('✅ Mobile message sent via P2P:', message);
+        } else {
+            console.warn('⚠️ No P2P connection - message not sent');
+            showToast('⚠️ Not connected to peer');
+            return;
+        }
+        
+        // Display message locally
         addMessageToChat(window.currentUser || 'You', message);
-        console.log('Mobile message sent (frontend-only):', message);
     }
 }
 
@@ -962,6 +988,8 @@ let isAudioMuted = false;
 let isVideoOff = false;
 let callStartTime = null;
 let callDurationInterval = null;
+let dataConnection = null; // Data connection for messaging
+let isUserA = false; // Track if this user created the room
 
 // Initialize PeerJS when page loads
 window.addEventListener('DOMContentLoaded', function() {
@@ -1024,15 +1052,43 @@ function initializePeer(peerId) {
                 handleIncomingCall(incomingCall);
             });
 
-            // Listen for connection events
+            // Listen for incoming data connections (User A receives connection from User B)
             peer.on('connection', (conn) => {
-                console.log('🔗 Data connection established');
-                conn.on('data', (data) => {
-                    console.log('📨 Received data:', data);
-                    if (data.type === 'message') {
-                        displayReceivedMessage(data.text);
-                    }
-                });
+                console.log('🔗 Incoming data connection from:', conn.peer);
+                setupDataConnection(conn);
+                
+                // User A: Notify that User B has connected
+                if (isUserA) {
+                    setTimeout(() => {
+                        showToast('🎉 Peer connected! You can now chat and call.');
+                        enableCallButtons();
+                        
+                        // Open chat window for User A
+                        openChat(`P2P Room`);
+                        
+                        // Show connection message
+                        const messagesArea = document.querySelector('.messages-area');
+                        if (messagesArea) {
+                            const welcomeMsg = document.createElement('div');
+                            welcomeMsg.className = 'system-message';
+                            welcomeMsg.innerHTML = `
+                                <div style="background: linear-gradient(135deg, rgba(0,102,204,0.1), rgba(0,170,85,0.1)); padding: 20px; border-radius: 12px; margin: 20px 0; border-left: 4px solid #00AA55;">
+                                    <p style="font-weight: 600; color: #00CC66; margin-bottom: 10px; font-size: 16px;">🎉 Peer Connected!</p>
+                                    <p style="font-size: 14px; color: rgba(255,255,255,0.9); margin-bottom: 8px;">
+                                        ✅ Peer-to-peer connection established<br>
+                                        🔒 End-to-end encrypted<br>
+                                        📞 Audio & video calls ready<br>
+                                        💬 Start chatting below
+                                    </p>
+                                    <p style="font-size: 12px; color: rgba(255,255,255,0.6); margin-top: 10px;">
+                                        No servers processing your media - direct device-to-device connection!
+                                    </p>
+                                </div>
+                            `;
+                            messagesArea.appendChild(welcomeMsg);
+                        }
+                    }, 500);
+                }
             });
 
         } catch (error) {
@@ -1053,6 +1109,10 @@ async function createRoom() {
         currentRoomId = roomCode;
         
         console.log('📤 Room created:', roomCode);
+        
+        // Mark this user as User A (room creator)
+        isUserA = true;
+        window.remotePeerId = null; // Will be set when User B connects
         
         // Initialize PeerJS with this room code
         await initializePeer(roomCode);
@@ -1275,6 +1335,9 @@ async function joinRoomSilently(roomCode) {
         // Generate a random peer ID for joiner
         const myPeerId = 'peer-' + Math.random().toString(36).substring(2, 15);
         
+        // Mark this user as User B (joiner)
+        isUserA = false;
+        
         // Initialize PeerJS
         await initializePeer(myPeerId);
         
@@ -1282,6 +1345,11 @@ async function joinRoomSilently(roomCode) {
         window.remotePeerId = roomCode;
         
         console.log('✅ Silently connected to room:', roomCode);
+        
+        // User B: Establish data connection to User A
+        console.log('📡 User B connecting to User A:', roomCode);
+        const conn = peer.connect(roomCode, { reliable: true });
+        setupDataConnection(conn);
         
         // Close any modal if open
         closeRoomModal();
@@ -1683,21 +1751,50 @@ function endCall() {
     console.log('✅ Call ended');
 }
 
+// Setup data connection for messaging
+function setupDataConnection(conn) {
+    dataConnection = conn;
+    
+    conn.on('open', () => {
+        console.log('✅ Data connection opened with:', conn.peer);
+        window.remotePeerId = conn.peer;
+        showToast('✅ Connected! You can now chat.');
+    });
+    
+    conn.on('data', (data) => {
+        console.log('📨 Received data:', data);
+        if (data.type === 'message') {
+            displayReceivedMessage(data.text);
+        }
+    });
+    
+    conn.on('close', () => {
+        console.log('❌ Data connection closed');
+        showToast('⚠️ Peer disconnected');
+        dataConnection = null;
+    });
+    
+    conn.on('error', (error) => {
+        console.error('❌ Data connection error:', error);
+    });
+}
+
 // Display received message
 function displayReceivedMessage(text) {
-    const chatMessages = document.getElementById('chatMessages');
-    if (!chatMessages) return;
+    const messagesArea = document.querySelector('.messages-area');
+    if (!messagesArea) return;
     
     const messageDiv = document.createElement('div');
     messageDiv.className = 'message received';
+    const time = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     messageDiv.innerHTML = `
-        <div class="message-bubble">
-            <div class="message-text">${text}</div>
-            <div class="message-time">${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+        <div class="message-content">
+            <p>${text}</p>
+            <span class="message-time">${time}</span>
         </div>
     `;
-    chatMessages.appendChild(messageDiv);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+    messagesArea.appendChild(messageDiv);
+    messagesArea.scrollTop = messagesArea.scrollHeight;
 }
 
 // Make functions globally available
