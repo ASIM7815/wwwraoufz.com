@@ -1065,21 +1065,25 @@ async function createRoom() {
         // Generate shareable link
         const shareableLink = `${window.location.origin}${window.location.pathname}?room=${roomCode}`;
         
-        // Create beautiful share message
-        const shareMessage = `💬 WELCOME TO RAOUFz 💬
+        // Create pre-planned message explaining the serverless P2P system
+        const preMessage = `🎥 Join my secure video chat on RAOUFz!
 
-🎉 You're invited to connect!
+Click this link to connect instantly:
+${shareableLink}
 
-Just click the link below to instantly connect with your loved ones:
+✨ What happens when you click:
+• You'll be directed to RAOUFz website
+• Connection happens automatically (no code needed!)
+• We'll be connected peer-to-peer (P2P)
+• Audio & video calls available instantly
 
-🔗 ${shareableLink}
+🔒 Privacy Features:
+• No central server processes our media
+• Direct device-to-device connection
+• End-to-end encrypted streams
+• Fast & low-latency calling
 
-✨ No login required
-✨ Instant connection
-✨ Video & Audio calls
-✨ Secure messaging
-
-Click and connect now! 💙`;
+Just click the link above and we're connected! 🚀`;
         
         // Simplified UI - Only 3 options
         document.getElementById('waitingText').innerHTML = `
@@ -1088,23 +1092,23 @@ Click and connect now! 💙`;
                 <p style="font-size: 14px; color: rgba(255,255,255,0.9); margin-bottom: 25px;">Choose how to share:</p>
                 
                 <button onclick="copyCode()" style="width: 100%; background: linear-gradient(135deg, #0066CC, #0047AB); color: white; border: none; padding: 15px; border-radius: 10px; cursor: pointer; font-weight: 600; font-size: 15px; margin-bottom: 12px; box-shadow: 0 4px 15px rgba(0,102,204,0.3); transition: all 0.3s;">
-                    📋 Copy Code
+                    📋 Copy Code Only
                 </button>
                 
                 <button onclick="copyShareLink()" style="width: 100%; background: linear-gradient(135deg, #00AA55, #008844); color: white; border: none; padding: 15px; border-radius: 10px; cursor: pointer; font-weight: 600; font-size: 15px; margin-bottom: 12px; box-shadow: 0 4px 15px rgba(0,170,85,0.3); transition: all 0.3s;">
-                    🔗 Copy Link
+                    🔗 Copy Link Only
                 </button>
                 
-                <button onclick="shareRoomDirectly()" style="width: 100%; background: linear-gradient(135deg, #CC6600, #AA5500); color: white; border: none; padding: 15px; border-radius: 10px; cursor: pointer; font-weight: 600; font-size: 15px; box-shadow: 0 4px 15px rgba(204,102,0,0.3); transition: all 0.3s;">
-                    📤 Share Link
+                <button onclick="copyFullMessage()" style="width: 100%; background: linear-gradient(135deg, #CC6600, #AA5500); color: white; border: none; padding: 15px; border-radius: 10px; cursor: pointer; font-weight: 600; font-size: 15px; box-shadow: 0 4px 15px rgba(204,102,0,0.3); transition: all 0.3s;">
+                    📤 Copy Full Message
                 </button>
                 
-                <p style="font-size: 12px; color: rgba(255,255,255,0.5); margin-top: 20px;">Waiting for someone to join...</p>
+                <p style="font-size: 12px; color: rgba(255,255,255,0.5); margin-top: 20px;">⏳ Waiting for peer to connect...</p>
             </div>
         `;
         
         // Store the share message for later
-        window.currentShareMessage = shareMessage;
+        window.currentShareMessage = preMessage;
         window.currentShareLink = shareableLink;
         
         // Open a chat window for this room
@@ -1145,6 +1149,18 @@ function copyShareLink() {
     }
 }
 
+// Copy the full message with explanation (NEW FUNCTION)
+function copyFullMessage() {
+    if (window.currentShareMessage) {
+        navigator.clipboard.writeText(window.currentShareMessage).then(() => {
+            showToast('✅ Full message copied! Paste in WhatsApp, SMS, or anywhere.');
+        }).catch(err => {
+            console.error('Failed to copy:', err);
+            alert(window.currentShareMessage);
+        });
+    }
+}
+
 // Simple toast notification
 function showToast(message) {
     // Remove existing toast
@@ -1180,39 +1196,19 @@ function showToast(message) {
 }
 
 // Share via Web Share API
-// Share via Web Share API or fallback to copy
 function shareRoomDirectly() {
     if (navigator.share && window.currentShareMessage) {
         navigator.share({
-            title: '💬 Join my RAOUFz video chat!',
+            title: 'Join my RAOUFz video chat!',
             text: window.currentShareMessage
         }).then(() => {
             console.log('✅ Shared successfully');
-            showToast('✅ Shared successfully!');
         }).catch(err => {
             console.log('Share cancelled or failed:', err);
-            // Fallback to copy
-            copyFullShareMessage();
+            copyShareMessage(); // Fallback to copy
         });
     } else {
-        // Fallback if Web Share API not supported
-        copyFullShareMessage();
-    }
-}
-
-// Copy the full beautiful share message
-function copyFullShareMessage() {
-    if (window.currentShareMessage) {
-        navigator.clipboard.writeText(window.currentShareMessage).then(() => {
-            showToast('✅ Share message copied! Paste in WhatsApp, SMS, or any app.');
-        }).catch(err => {
-            console.error('Failed to copy:', err);
-            // Ultimate fallback
-            prompt('Copy this message:', window.currentShareMessage);
-        });
-    } else if (window.currentShareLink) {
-        // If message not available, at least copy the link
-        copyShareLink();
+        copyShareMessage(); // Fallback
     }
 }
 
@@ -1287,14 +1283,47 @@ async function joinRoomSilently(roomCode) {
         
         console.log('✅ Silently connected to room:', roomCode);
         
+        // Close any modal if open
+        closeRoomModal();
+        
         // AUTOMATICALLY open chat (User B sees message section immediately)
-        openChat(`Room ${roomCode}`);
-        updateRoomInfoCard(roomCode, true); // true = hide code from User B
+        setTimeout(() => {
+            openChat(`P2P Room`);
+            updateRoomInfoCard(roomCode, true); // true = hide code from User B
+            
+            // Show welcome message explaining P2P connection
+            const messagesArea = document.querySelector('.messages-area');
+            if (messagesArea) {
+                const welcomeMsg = document.createElement('div');
+                welcomeMsg.className = 'system-message';
+                welcomeMsg.innerHTML = `
+                    <div style="background: linear-gradient(135deg, rgba(0,102,204,0.1), rgba(0,170,85,0.1)); padding: 20px; border-radius: 12px; margin: 20px 0; border-left: 4px solid #00AA55;">
+                        <p style="font-weight: 600; color: #00CC66; margin-bottom: 10px; font-size: 16px;">🎉 Connected Successfully!</p>
+                        <p style="font-size: 14px; color: rgba(255,255,255,0.9); margin-bottom: 8px;">
+                            ✅ Peer-to-peer connection established<br>
+                            🔒 End-to-end encrypted<br>
+                            📞 Audio & video calls ready<br>
+                            💬 Start chatting below
+                        </p>
+                        <p style="font-size: 12px; color: rgba(255,255,255,0.6); margin-top: 10px;">
+                            No servers processing your media - direct device-to-device connection!
+                        </p>
+                    </div>
+                `;
+                messagesArea.appendChild(welcomeMsg);
+            }
+            
+            // Enable call buttons
+            enableCallButtons();
+            
+            // Show toast notification
+            showToast('🎉 Connected! You can now chat and make calls.');
+        }, 300);
         
         // Update participants count
         const participantsCount = document.getElementById('participantsCount');
         if (participantsCount) {
-            participantsCount.textContent = '👥 2 participants (Connected!)';
+            participantsCount.textContent = '👥 2 participants (P2P Connected!)';
         }
         
         // NO alerts - just silently connected!
@@ -1684,7 +1713,8 @@ window.shareRoomLink = shareRoomLink;
 window.shareRoomDirectly = shareRoomDirectly;
 window.copyCode = copyCode;
 window.copyShareLink = copyShareLink;
+window.copyFullMessage = copyFullMessage;
 window.joinRoomSilently = joinRoomSilently;
-window.copyFullShareMessage = copyFullShareMessage;
+
 
 
