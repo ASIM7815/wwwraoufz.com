@@ -1065,6 +1065,22 @@ async function createRoom() {
         // Generate shareable link
         const shareableLink = `${window.location.origin}${window.location.pathname}?room=${roomCode}`;
         
+        // Create beautiful share message
+        const shareMessage = `💬 WELCOME TO RAOUFz 💬
+
+🎉 You're invited to connect!
+
+Just click the link below to instantly connect with your loved ones:
+
+🔗 ${shareableLink}
+
+✨ No login required
+✨ Instant connection
+✨ Video & Audio calls
+✨ Secure messaging
+
+Click and connect now! 💙`;
+        
         // Simplified UI - Only 3 options
         document.getElementById('waitingText').innerHTML = `
             <div style="text-align: center;">
@@ -1088,7 +1104,7 @@ async function createRoom() {
         `;
         
         // Store the share message for later
-        window.currentShareMessage = preMessage;
+        window.currentShareMessage = shareMessage;
         window.currentShareLink = shareableLink;
         
         // Open a chat window for this room
@@ -1164,19 +1180,39 @@ function showToast(message) {
 }
 
 // Share via Web Share API
+// Share via Web Share API or fallback to copy
 function shareRoomDirectly() {
     if (navigator.share && window.currentShareMessage) {
         navigator.share({
-            title: 'Join my RAOUFz video chat!',
+            title: '💬 Join my RAOUFz video chat!',
             text: window.currentShareMessage
         }).then(() => {
             console.log('✅ Shared successfully');
+            showToast('✅ Shared successfully!');
         }).catch(err => {
             console.log('Share cancelled or failed:', err);
-            copyShareMessage(); // Fallback to copy
+            // Fallback to copy
+            copyFullShareMessage();
         });
     } else {
-        copyShareMessage(); // Fallback
+        // Fallback if Web Share API not supported
+        copyFullShareMessage();
+    }
+}
+
+// Copy the full beautiful share message
+function copyFullShareMessage() {
+    if (window.currentShareMessage) {
+        navigator.clipboard.writeText(window.currentShareMessage).then(() => {
+            showToast('✅ Share message copied! Paste in WhatsApp, SMS, or any app.');
+        }).catch(err => {
+            console.error('Failed to copy:', err);
+            // Ultimate fallback
+            prompt('Copy this message:', window.currentShareMessage);
+        });
+    } else if (window.currentShareLink) {
+        // If message not available, at least copy the link
+        copyShareLink();
     }
 }
 
@@ -1649,6 +1685,6 @@ window.shareRoomDirectly = shareRoomDirectly;
 window.copyCode = copyCode;
 window.copyShareLink = copyShareLink;
 window.joinRoomSilently = joinRoomSilently;
-
+window.copyFullShareMessage = copyFullShareMessage;
 
 
