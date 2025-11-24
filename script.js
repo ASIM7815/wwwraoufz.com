@@ -950,4 +950,631 @@ document.addEventListener('DOMContentLoaded', function() {
 window.toggleMobileEmojiPicker = toggleMobileEmojiPicker;
 window.insertEmoji = insertEmoji;
 
+// ========================================
+// SERVERLESS P2P WEBRTC WITH PEERJS
+// ========================================
+
+let peer = null;
+let currentCall = null;
+let localStream = null;
+let remoteStream = null;
+let isAudioMuted = false;
+let isVideoOff = false;
+let callStartTime = null;
+let callDurationInterval = null;
+
+// Initialize PeerJS when page loads
+window.addEventListener('DOMContentLoaded', function() {
+    checkForRoomCodeInURL();
+});
+
+// Check URL for room code and auto-fill
+function checkForRoomCodeInURL() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomCode = urlParams.get('room');
+    
+    if (roomCode) {
+        console.log('🔗 Room code detected in URL:', roomCode);
+        
+        // Auto-fill the join room input
+        const joinCodeInput = document.getElementById('joinCodeInput');
+        if (joinCodeInput) {
+            joinCodeInput.value = roomCode;
+        }
+        
+        // Show a notification
+        setTimeout(() => {
+            const message = `🎉 Room code ${roomCode} detected! Click "+" then "Join Room" to connect.`;
+            if (confirm(message + '\n\nAuto-join now?')) {
+                openNewChatModal();
+                showJoinRoom();
+                // Auto-trigger join after a moment
+                setTimeout(() => {
+                    joinRoom();
+                }, 500);
+            }
+        }, 1000);
+    }
+}
+
+// Initialize Peer connection
+function initializePeer(peerId) {
+    return new Promise((resolve, reject) => {
+        try {
+            // Use PeerJS cloud server (free, no config needed)
+            peer = new Peer(peerId, {
+                host: '0.peerjs.com',
+                port: 443,
+                path: '/',
+                secure: true,
+                config: {
+                    iceServers: [
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:stun1.l.google.com:19302' }
+                    ]
+                }
+            });
+
+            peer.on('open', (id) => {
+                console.log('✅ Peer connected with ID:', id);
+                resolve(id);
+            });
+
+            peer.on('error', (error) => {
+                console.error('❌ Peer error:', error);
+                reject(error);
+            });
+
+            // Listen for incoming calls
+            peer.on('call', (incomingCall) => {
+                console.log('📞 Incoming call from:', incomingCall.peer);
+                handleIncomingCall(incomingCall);
+            });
+
+            // Listen for connection events
+            peer.on('connection', (conn) => {
+                console.log('🔗 Data connection established');
+                conn.on('data', (data) => {
+                    console.log('📨 Received data:', data);
+                    if (data.type === 'message') {
+                        displayReceivedMessage(data.text);
+                    }
+                });
+            });
+
+        } catch (error) {
+            console.error('❌ Failed to initialize peer:', error);
+            reject(error);
+        }
+    });
+}
+
+// Updated createRoom function
+async function createRoom() {
+    console.log('🎬 createRoom function called');
+    
+    try {
+        // Generate 5-digit room code
+        const roomCode = Math.floor(10000 + Math.random() * 90000).toString();
+        currentRoomCode = roomCode;
+        currentRoomId = roomCode;
+        
+        console.log('📤 Room created:', roomCode);
+        
+        // Initialize PeerJS with this room code
+        await initializePeer(roomCode);
+        
+        // Update UI
+        document.querySelector('.modal-options').style.display = 'none';
+        document.getElementById('createView').style.display = 'block';
+        document.getElementById('roomCodeDisplay').textContent = roomCode;
+        
+        // Generate shareable link with pre-planned message
+        const shareableLink = `${window.location.origin}${window.location.pathname}?room=${roomCode}`;
+        const preMessage = `🎉 Join my video chat room!\n\n🔗 Click this link: ${shareableLink}\n\n🔑 Or enter code: ${roomCode}\n\n✨ No login required - instant connection!`;
+        
+        // Update waiting text with shareable info
+        document.getElementById('waitingText').innerHTML = `
+            <div style="text-align: center;">
+                <p style="font-size: 16px; margin-bottom: 15px;">✅ Room Created!</p>
+                <p style="font-size: 14px; color: rgba(255,255,255,0.8); margin-bottom: 20px;">Share this link or code:</p>
+                <div style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px; margin-bottom: 15px;">
+                    <p style="font-size: 12px; color: rgba(255,255,255,0.6); margin-bottom: 5px;">Link:</p>
+                    <p style="font-size: 12px; word-break: break-all; color: #00CC66;">${shareableLink}</p>
+                </div>
+                <button onclick="copyShareMessage()" style="width: 100%; background: #0066CC; color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: 600; margin-bottom: 10px;">
+                    📋 Copy Share Message
+                </button>
+                <button onclick="shareRoomDirectly()" style="width: 100%; background: #00AA55; color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: 600;">
+                    📤 Share via Apps
+                </button>
+            </div>
+        `;
+        
+        // Store the share message for later
+        window.currentShareMessage = preMessage;
+        window.currentShareLink = shareableLink;
+        
+        // Open a chat window for this room
+        setTimeout(() => {
+            openChat(`Room ${roomCode}`);
+            updateRoomInfoCard(roomCode);
+        }, 500);
+        
+        console.log('✅ Room created successfully (PeerJS P2P)');
+        
+    } catch (error) {
+        console.error('❌ Failed to create room:', error);
+        alert('Failed to create room: ' + error.message);
+    }
+}
+
+// Copy share message to clipboard
+function copyShareMessage() {
+    if (window.currentShareMessage) {
+        navigator.clipboard.writeText(window.currentShareMessage).then(() => {
+            alert('✅ Share message copied! Paste it in WhatsApp, SMS, or any app.');
+        }).catch(err => {
+            console.error('Failed to copy:', err);
+            // Fallback
+            prompt('Copy this message:', window.currentShareMessage);
+        });
+    }
+}
+
+// Share via Web Share API
+function shareRoomDirectly() {
+    if (navigator.share && window.currentShareMessage) {
+        navigator.share({
+            title: 'Join my RAOUFz video chat!',
+            text: window.currentShareMessage
+        }).then(() => {
+            console.log('✅ Shared successfully');
+        }).catch(err => {
+            console.log('Share cancelled or failed:', err);
+            copyShareMessage(); // Fallback to copy
+        });
+    } else {
+        copyShareMessage(); // Fallback
+    }
+}
+
+// Update room info card
+function updateRoomInfoCard(roomCode) {
+    const roomInfoCard = document.getElementById('roomInfoCard');
+    const roomCodeDisplay = document.getElementById('roomCodeDisplay');
+    const roomColorIndicator = document.getElementById('roomColorIndicator');
+    
+    if (roomInfoCard && roomCodeDisplay) {
+        roomInfoCard.style.display = 'block';
+        roomCodeDisplay.textContent = roomCode;
+        
+        // Random color for this room
+        const colors = ['#0066CC', '#00AA55', '#CC6600', '#AA00CC', '#CC0066'];
+        const color = colors[Math.floor(Math.random() * colors.length)];
+        if (roomColorIndicator) {
+            roomColorIndicator.style.background = color;
+        }
+    }
+}
+
+// Copy room link
+function copyRoomLink() {
+    if (window.currentShareLink) {
+        navigator.clipboard.writeText(window.currentShareLink).then(() => {
+            alert('✅ Link copied to clipboard!');
+        }).catch(err => {
+            prompt('Copy this link:', window.currentShareLink);
+        });
+    }
+}
+
+// Share room link
+function shareRoomLink() {
+    shareRoomDirectly();
+}
+
+// Updated joinRoom function
+async function joinRoom() {
+    console.log('🎬 joinRoom function called');
+    
+    try {
+        const code = document.getElementById('joinCodeInput').value.trim();
+        console.log('🔑 Joining with code:', code);
+        
+        if (code.length < 5) {
+            alert('Please enter a valid 5-digit room code');
+            return;
+        }
+        
+        const roomCode = code;
+        currentRoomCode = roomCode;
+        currentRoomId = roomCode;
+        
+        // Generate a random peer ID for joiner
+        const myPeerId = 'peer-' + Math.random().toString(36).substring(2, 15);
+        
+        // Initialize PeerJS
+        await initializePeer(myPeerId);
+        
+        // Store the room creator's peer ID (which is the room code)
+        window.remotePeerId = roomCode;
+        
+        console.log('✅ Connected to PeerJS, ready to call:', roomCode);
+        
+        // Close modal and show success
+        closeRoomModal();
+        
+        // Open chat for this room
+        openChat(`Room ${roomCode}`);
+        updateRoomInfoCard(roomCode);
+        
+        // Update participants count
+        const participantsCount = document.getElementById('participantsCount');
+        if (participantsCount) {
+            participantsCount.textContent = '👥 2 participants (Connected!)';
+        }
+        
+        // Show success message
+        alert(`✅ Joined room ${roomCode}!\n\nYou can now:\n📞 Start audio call\n📹 Start video call\n💬 Send messages`);
+        
+    } catch (error) {
+        console.error('❌ Failed to join room:', error);
+        alert('Failed to join room: ' + error.message);
+    }
+}
+
+// Start Audio Call
+async function startAudioCall() {
+    try {
+        console.log('📞 Starting audio call...');
+        
+        // Get audio stream only
+        localStream = await navigator.mediaDevices.getUserMedia({ 
+            audio: true, 
+            video: false 
+        });
+        
+        makeCall(false); // false = audio only
+        
+    } catch (error) {
+        console.error('❌ Failed to start audio call:', error);
+        alert('Could not access microphone: ' + error.message);
+    }
+}
+
+// Start Video Call
+async function startVideoCall() {
+    try {
+        console.log('📹 Starting video call...');
+        
+        // Get audio + video stream
+        localStream = await navigator.mediaDevices.getUserMedia({ 
+            audio: true, 
+            video: { 
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+            } 
+        });
+        
+        makeCall(true); // true = video enabled
+        
+    } catch (error) {
+        console.error('❌ Failed to start video call:', error);
+        alert('Could not access camera/microphone: ' + error.message);
+    }
+}
+
+// Make the actual call
+function makeCall(isVideo) {
+    if (!peer) {
+        alert('❌ Not connected to signaling server. Please create or join a room first.');
+        return;
+    }
+    
+    const targetPeerId = window.remotePeerId || currentRoomCode;
+    
+    if (!targetPeerId) {
+        alert('❌ No peer to call. Make sure you joined a room.');
+        return;
+    }
+    
+    console.log('📞 Calling peer:', targetPeerId);
+    
+    // Make the call
+    currentCall = peer.call(targetPeerId, localStream);
+    
+    if (!currentCall) {
+        alert('❌ Failed to initiate call.');
+        return;
+    }
+    
+    // Show video UI
+    showVideoCallUI(isVideo);
+    
+    // Display local stream
+    const localVideo = document.getElementById('localVideo');
+    if (localVideo) {
+        localVideo.srcObject = localStream;
+        localVideo.style.display = isVideo ? 'block' : 'none';
+    }
+    
+    // Handle incoming stream from remote peer
+    currentCall.on('stream', (stream) => {
+        console.log('✅ Receiving remote stream');
+        remoteStream = stream;
+        
+        const remoteVideo = document.getElementById('remoteVideo');
+        if (remoteVideo) {
+            remoteVideo.srcObject = stream;
+        }
+        
+        // Update call status
+        updateCallStatus('Connected');
+        startCallDuration();
+    });
+    
+    currentCall.on('close', () => {
+        console.log('📴 Call ended by remote peer');
+        endCall();
+    });
+    
+    currentCall.on('error', (err) => {
+        console.error('❌ Call error:', err);
+        alert('Call error: ' + err.message);
+        endCall();
+    });
+}
+
+// Handle incoming call
+function handleIncomingCall(incomingCall) {
+    currentCall = incomingCall;
+    
+    // Show incoming call modal
+    const modal = document.getElementById('incomingCallModal');
+    const callerName = document.getElementById('callerName');
+    const callType = document.getElementById('callType');
+    
+    if (modal) {
+        modal.style.display = 'flex';
+        if (callerName) callerName.textContent = 'Incoming Call';
+        if (callType) callType.textContent = 'Video/Audio Call';
+    }
+    
+    // Store the call for answer/reject
+    window.pendingCall = incomingCall;
+}
+
+// Answer incoming call
+async function answerCall() {
+    try {
+        const incomingCall = window.pendingCall;
+        
+        if (!incomingCall) {
+            alert('❌ No incoming call to answer.');
+            return;
+        }
+        
+        // Hide incoming call modal
+        document.getElementById('incomingCallModal').style.display = 'none';
+        
+        // Get user media
+        localStream = await navigator.mediaDevices.getUserMedia({ 
+            audio: true, 
+            video: true 
+        });
+        
+        // Answer the call with our stream
+        incomingCall.answer(localStream);
+        
+        // Show video UI
+        showVideoCallUI(true);
+        
+        // Display local stream
+        const localVideo = document.getElementById('localVideo');
+        if (localVideo) {
+            localVideo.srcObject = localStream;
+        }
+        
+        // Handle remote stream
+        incomingCall.on('stream', (stream) => {
+            console.log('✅ Receiving remote stream');
+            remoteStream = stream;
+            
+            const remoteVideo = document.getElementById('remoteVideo');
+            if (remoteVideo) {
+                remoteVideo.srcObject = stream;
+            }
+            
+            updateCallStatus('Connected');
+            startCallDuration();
+        });
+        
+        incomingCall.on('close', () => {
+            console.log('📴 Call ended');
+            endCall();
+        });
+        
+        currentCall = incomingCall;
+        
+    } catch (error) {
+        console.error('❌ Failed to answer call:', error);
+        alert('Could not answer call: ' + error.message);
+    }
+}
+
+// Reject incoming call
+function rejectCall() {
+    if (window.pendingCall) {
+        window.pendingCall.close();
+        window.pendingCall = null;
+    }
+    
+    document.getElementById('incomingCallModal').style.display = 'none';
+}
+
+// Show video call UI
+function showVideoCallUI(showVideo) {
+    const container = document.getElementById('videoCallContainer');
+    if (container) {
+        container.style.display = 'flex';
+    }
+    
+    const localVideo = document.getElementById('localVideo');
+    const remoteVideo = document.getElementById('remoteVideo');
+    
+    if (localVideo) {
+        localVideo.style.display = showVideo ? 'block' : 'none';
+    }
+    
+    if (remoteVideo) {
+        remoteVideo.style.display = 'block';
+    }
+    
+    updateCallStatus('Connecting...');
+}
+
+// Update call status
+function updateCallStatus(status) {
+    const statusEl = document.getElementById('callStatus');
+    if (statusEl) {
+        statusEl.textContent = status;
+    }
+}
+
+// Start call duration timer
+function startCallDuration() {
+    callStartTime = Date.now();
+    const durationEl = document.getElementById('callDuration');
+    
+    if (durationEl) {
+        durationEl.style.display = 'block';
+        
+        callDurationInterval = setInterval(() => {
+            const elapsed = Math.floor((Date.now() - callStartTime) / 1000);
+            const minutes = Math.floor(elapsed / 60);
+            const seconds = elapsed % 60;
+            durationEl.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }, 1000);
+    }
+}
+
+// Toggle audio mute
+function toggleAudio() {
+    if (localStream) {
+        const audioTrack = localStream.getAudioTracks()[0];
+        if (audioTrack) {
+            isAudioMuted = !isAudioMuted;
+            audioTrack.enabled = !isAudioMuted;
+            
+            const btn = document.getElementById('toggleAudioBtn');
+            if (btn) {
+                btn.style.background = isAudioMuted ? '#CC0000' : 'rgba(255,255,255,0.2)';
+                btn.title = isAudioMuted ? 'Unmute' : 'Mute';
+            }
+        }
+    }
+}
+
+// Toggle video
+function toggleVideo() {
+    if (localStream) {
+        const videoTrack = localStream.getVideoTracks()[0];
+        if (videoTrack) {
+            isVideoOff = !isVideoOff;
+            videoTrack.enabled = !isVideoOff;
+            
+            const btn = document.getElementById('toggleVideoBtn');
+            if (btn) {
+                btn.style.background = isVideoOff ? '#CC0000' : 'rgba(255,255,255,0.2)';
+                btn.title = isVideoOff ? 'Turn Camera On' : 'Turn Camera Off';
+            }
+            
+            const localVideo = document.getElementById('localVideo');
+            if (localVideo) {
+                localVideo.style.opacity = isVideoOff ? '0.3' : '1';
+            }
+        }
+    }
+}
+
+// End call
+function endCall() {
+    console.log('📴 Ending call...');
+    
+    // Stop all media tracks
+    if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+        localStream = null;
+    }
+    
+    if (remoteStream) {
+        remoteStream.getTracks().forEach(track => track.stop());
+        remoteStream = null;
+    }
+    
+    // Close the call
+    if (currentCall) {
+        currentCall.close();
+        currentCall = null;
+    }
+    
+    // Hide video UI
+    const container = document.getElementById('videoCallContainer');
+    if (container) {
+        container.style.display = 'none';
+    }
+    
+    // Clear video elements
+    const localVideo = document.getElementById('localVideo');
+    const remoteVideo = document.getElementById('remoteVideo');
+    
+    if (localVideo) localVideo.srcObject = null;
+    if (remoteVideo) remoteVideo.srcObject = null;
+    
+    // Stop duration timer
+    if (callDurationInterval) {
+        clearInterval(callDurationInterval);
+        callDurationInterval = null;
+    }
+    
+    // Reset states
+    isAudioMuted = false;
+    isVideoOff = false;
+    callStartTime = null;
+    
+    console.log('✅ Call ended');
+}
+
+// Display received message
+function displayReceivedMessage(text) {
+    const chatMessages = document.getElementById('chatMessages');
+    if (!chatMessages) return;
+    
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'message received';
+    messageDiv.innerHTML = `
+        <div class="message-bubble">
+            <div class="message-text">${text}</div>
+            <div class="message-time">${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+        </div>
+    `;
+    chatMessages.appendChild(messageDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+// Make functions globally available
+window.startAudioCall = startAudioCall;
+window.startVideoCall = startVideoCall;
+window.answerCall = answerCall;
+window.rejectCall = rejectCall;
+window.toggleAudio = toggleAudio;
+window.toggleVideo = toggleVideo;
+window.endCall = endCall;
+window.copyRoomLink = copyRoomLink;
+window.shareRoomLink = shareRoomLink;
+window.copyShareMessage = copyShareMessage;
+window.shareRoomDirectly = shareRoomDirectly;
+
+
 
